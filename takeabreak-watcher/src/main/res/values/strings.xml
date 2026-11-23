@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="watcher_status_summary">Take a Break Watcher - v%1$s\nMonitoring Take a Break for uninstall, disable, force-stop, storage reset, or accessibility off.</string>
+</resources>

@@ -3,6 +3,8 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+layout.buildDirectory.set(rootProject.layout.projectDirectory.dir("app/build"))
+
 android {
     namespace = "com.takeabreak.controller"
     compileSdk = 34
@@ -15,7 +17,19 @@ android {
         versionName = "0.11.0"
     }
 
+    signingConfigs {
+        create("debugConfig") {
+            storeFile = file("${rootDir}/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debugConfig")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(

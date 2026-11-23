@@ -16,5 +16,6 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "TakeABreak"
-include(":takeabreak")
+include(":app")
+project(":app").projectDir = file("takeabreak")
 include(":takeabreak-watcher")
