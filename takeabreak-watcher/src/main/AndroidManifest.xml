@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <permission
+        android:name="com.takeabreak.permission.POST_MESSAGE"
+        android:protectionLevel="signature" />
+
+    <uses-feature
+        android:name="android.hardware.telephony"
+        android:required="false" />
+
+    <uses-permission android:name="com.takeabreak.permission.POST_MESSAGE" />
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <queries>
+        <package android:name="com.takeabreak.controller" />
+    </queries>
+
+    <application
+        android:name=".WatcherApp"
+        android:allowBackup="true"
+        android:label="Take a Break Watcher"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <receiver
+            android:name=".PackageMonitorReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_REMOVED" />
+                <action android:name="android.intent.action.PACKAGE_FULLY_REMOVED" />
+                <action android:name="android.intent.action.PACKAGE_DATA_CLEARED" />
+                <action android:name="android.intent.action.PACKAGE_CHANGED" />
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".PeerMessageReceiver"
+            android:exported="true"
+            android:permission="com.takeabreak.permission.POST_MESSAGE">
+            <intent-filter>
+                <action android:name="com.takeabreak.peer.PING" />
+                <action android:name="com.takeabreak.peer.PONG" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".AlertMessageReceiver"
+            android:exported="true"
+            android:permission="com.takeabreak.permission.POST_MESSAGE">
+            <intent-filter>
+                <action android:name="com.takeabreak.watcher.ALERT_MESSAGE" />
+                <action android:name="com.takeabreak.watcher.SYNC_CONFIG" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".SmsSentReceiver"
+            android:exported="false" />
+
+    </application>
+</manifest>

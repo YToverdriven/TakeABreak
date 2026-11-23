@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_description">Detects which apps are visible on screen so Take a Break can block apps that are PIN-locked or over their daily limit. Only app package names are used; screen content is not read or stored. The shortcut option shown by Android does not need to be enabled for this service to function.</string>
+    <string name="app_name">Take a Break</string>
+    <string name="main_title">Take a Break - v%1$s</string>
+    <string name="select_apps_title">Select apps to lock</string>
+    <string name="app_row_format">%1$s\n%2$s</string>
+    <string name="screen_pinned_note">This app is screen-pinned, so Home and Recents are disabled. To leave it: hold Back + Overview (3-button navigation) or swipe up and hold (gesture navigation), then go Home. Android may ask for your fingerprint or PIN when you unpin; that is normal. The PIN pad below still works.</string>
+    <string name="debug_title">Debug</string>
+    <string name="enter_current_pin">Enter current PIN</string>
+    <string name="sms_alerts_title">Text Message Alerts</string>
+    <string name="daily_status_scheduled_time">Scheduled time: %1$s</string>
+    <string name="time_spent_title">Time Spent on Apps</string>
+    <string name="time_spent_empty">No usage recorded yet today.\nOpen some apps (with Accessibility Service enabled) to start tracking.</string>
+    <string name="usage_limits_title">App Usage Limits</string>
+</resources>
