@@ -16,6 +16,7 @@ import android.content.IntentFilter
 class PackageMonitorReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
+            Intent.ACTION_PACKAGE_ADDED,
             Intent.ACTION_PACKAGE_REMOVED,
             Intent.ACTION_PACKAGE_FULLY_REMOVED,
             Intent.ACTION_PACKAGE_DATA_CLEARED,
@@ -26,6 +27,7 @@ class PackageMonitorReceiver : BroadcastReceiver() {
 
     companion object {
         fun filter(): IntentFilter = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
             addAction(Intent.ACTION_PACKAGE_REMOVED)
             addAction(Intent.ACTION_PACKAGE_FULLY_REMOVED)
             addAction(Intent.ACTION_PACKAGE_DATA_CLEARED)

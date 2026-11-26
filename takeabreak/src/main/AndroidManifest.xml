@@ -21,7 +21,9 @@
     <application
         android:name=".TakeABreakApp"
         android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
         android:label="Take a Break"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
 
@@ -38,6 +40,10 @@
             android:name=".PinSetupActivity"
             android:exported="false"
             android:windowSoftInputMode="stateVisible|adjustResize" />
+        <activity
+            android:name=".PermissionsSetupActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
         <activity android:name=".AppSelectorActivity" android:exported="false" />
         <activity android:name=".UsageLimitsActivity" android:exported="false" />
         <activity android:name=".TimeSpentActivity" android:exported="false" />
@@ -45,7 +51,6 @@
             android:name=".SmsAlertsActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
-        <activity android:name=".DebugActivity" android:exported="false" />
 
         <service
             android:name=".AppLockAccessibilityService"
@@ -58,18 +63,6 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
-
-        <receiver
-            android:name=".DeviceAdminReceiver"
-            android:permission="android.permission.BIND_DEVICE_ADMIN"
-            android:exported="true">
-            <meta-data
-                android:name="android.app.device_admin"
-                android:resource="@xml/device_admin" />
-            <intent-filter>
-                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
-            </intent-filter>
-        </receiver>
 
         <receiver
             android:name=".PackageMonitorReceiver"

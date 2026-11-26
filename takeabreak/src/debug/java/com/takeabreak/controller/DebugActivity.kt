@@ -1,6 +1,5 @@
 package com.takeabreak.controller
 
-import android.app.Activity
 import android.app.AlertDialog
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -16,7 +15,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 
-class DebugActivity : Activity() {
+class DebugActivity : PinLockedActivity() {
     private lateinit var statusView: TextView
 
     private val logReceiver = object : BroadcastReceiver() {
@@ -49,6 +48,7 @@ class DebugActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (isLockedOut) return
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -161,15 +161,17 @@ class DebugActivity : Activity() {
     }
 
     private fun confirm(title: String, message: String, onYes: () -> Unit) {
-        AlertDialog.Builder(this)
-            .setTitle(title)
-            .setMessage(message)
-            .setPositiveButton("Do it") { _, _ ->
-                onYes()
-                refreshStatus()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+        showManagedDialog(
+            AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton("Do it") { _, _ ->
+                    onYes()
+                    refreshStatus()
+                }
+                .setNegativeButton("Cancel", null)
+                .create(),
+        )
     }
 
     private fun dropPendingUsage() {

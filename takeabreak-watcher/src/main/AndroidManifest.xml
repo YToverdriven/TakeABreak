@@ -20,7 +20,9 @@
     <application
         android:name=".WatcherApp"
         android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
         android:label="Take a Break Watcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
 
@@ -33,6 +35,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".PermissionsSetupActivity"
+            android:exported="false" />
 
         <receiver
             android:name=".PackageMonitorReceiver"

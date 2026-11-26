@@ -1,6 +1,6 @@
 # Take a Break
 
-**Version 0.11.0**
+**Version 0.12.1**
 
 Take a Break restricts phone use. A PIN, preferably chosen by someone other than the person who uses the phone, gates selected apps. Daily time limits block an app once its allowance for the day is used up. Configurable events can send an SMS to a chosen phone number.
 
@@ -11,7 +11,7 @@ Version 1.0 is reserved until the apps are ready. Change history is in [VERSION_
 | App | Module | Package | What it does today |
 | --- | --- | --- | --- |
 | Take a Break | `:takeabreak` | `com.takeabreak.controller` | PIN, app lock, daily limits, today's usage, blocking, configurable SMS alerts with retry queue, and daily status check |
-| Take a Break Watcher | `:takeabreak-watcher` | `com.takeabreak.watcher` | Watches the controller. Sends an SMS (using the synced alert number and durable retry queue) if Take a Break is uninstalled, disabled, force-stopped, has its storage cleared, or has its accessibility service turned off. Shows the last ten messages from Take a Break, a link log, and a box to send a test SMS |
+| Take a Break Watcher | `:takeabreak-watcher` | `com.takeabreak.watcher` | Watches the controller. Sends an SMS (using the synced alert number and durable retry queue) if Take a Break is uninstalled, disabled, force-stopped, has its storage cleared, or has its accessibility service turned off. Release builds show only status and setup (no visible logs); debug builds also show the last ten messages from Take a Break, a link log, and a box to send a test SMS |
 
 ## Take a Break (controller)
 
@@ -22,12 +22,10 @@ The home screen shows how many apps are PIN-locked and how many have a usage lim
 - Set app usage limits
 - View time spent on apps
 - Configure **Text Message Alerts** (PIN required)
-- Open the system screen to enable the accessibility service
-- Open setup help for **Allow Restricted Settings** (shown while the accessibility service is off, with step-by-step instructions and shortcuts to App Info and Accessibility Settings for Android 13+ / GrapheneOS sideloaded installs)
-- Enable device admin (optional)
-- Open Debug (camera app count and list, SMS queue status, clear today's usage, clear limits, and other test actions)
+- Open **Setup & Permissions** (shown automatically on fresh install right after PIN setup, and accessible anytime to reconfigure Accessibility, Restricted Settings, and SMS permission)
+- Open Debug (**debug builds only** — camera app count and list, SMS queue status, clear today's usage, clear limits, and other test actions; excluded from release builds)
 
-Changing the PIN, choosing locked apps, editing limits, opening Text Message Alerts, and opening Debug each ask for the current PIN on a number pad, with no text field to tap first. Time spent can be opened without it. Each of those screens has a Back button, except App Usage Limits, which says Save and closes the screen.
+Changing the PIN, choosing locked apps, editing limits, opening Text Message Alerts, and (in debug builds) opening Debug each ask for the current PIN on a number pad, with no text field to tap first. Leaving the app while on any PIN-locked screen forces it back to the main screen so the PIN is required again on return. Time spent and Setup & Permissions can be opened without a PIN. Each of those screens has a Back button, except App Usage Limits, which says Save and closes the screen.
 
 ### PIN
 
@@ -35,7 +33,7 @@ The first launch asks for a PIN of at least 4 digits, entered twice. Those field
 
 ### App lock
 
-The lock list is the user-installed apps on the phone, plus the Play Store. A locked app asks for the PIN once per visit.
+The lock list and limit list include all launchable apps on the phone (both user-installed and preinstalled, such as Vanadium or the Play Store), excluding protected system apps, launchers, and keyboards. A locked app asks for the PIN once per visit.
 
 These are never blocked, even if an older save named them: every system camera app (a phone can have more than one), Phone (the default dialer and the system call screen), Settings, Google Play services, and the default SMS app. They are left off the lock list and the limit list. A sideloaded camera can still be locked. The Play Store stays available to lock.
 
@@ -77,10 +75,6 @@ The service reads only the package names of visible apps. It does not read or st
 
 After installing an update, turn the Take a Break accessibility service off and on once so Android picks up its window-list access.
 
-### Device admin
-
-Device admin is optional. The home screen can request it. On a dedicated phone the controller can also be set as device owner with adb (see below).
-
 ## Text Message Alerts & Retry Queue
 
 The **Text Message Alerts** screen (PIN-protected, inside Take a Break) configures the destination phone number (blank by default — no SMS alerts are queued or sent until a number is saved) and syncs the phone number and tamper-alert setting to Take a Break Watcher over a signature-protected broadcast. Both apps can request `SEND_SMS` permission and send test texts.
@@ -91,7 +85,7 @@ Toggleable SMS alert categories:
 | --- | --- | --- |
 | **New app installed** (updates ignored) | Controller | `ALERT: New app installed: <package>` |
 | **Take a Break or Watcher deleted, disabled, reset, or accessibility off** | Controller / Watcher (whichever survives) | `ALERT: … was uninstalled!`, `was disabled!`, `storage was cleared!`, `was stopped or its storage was cleared!`, or `Take a Break accessibility service was turned off!` |
-| **PIN entered for day-long app access** (when PIN unlocks a time-limited app for the rest of today) | Controller | `ALERT: PIN entered to unlock <App> for the rest of the day.` |
+| **PIN entered to unlock a blocked app** (PIN-locked app or time-limit reached) | Controller | `ALERT: PIN entered to unlock <App>.` or `ALERT: PIN entered to unlock <App> for the rest of the day.` |
 | **Once-a-day status check** (default **8:00 PM** local time; customizable via time picker) | Controller | `Take a Break daily status: Accessibility ON/OFF, Watcher …, X locked, Y limited.` |
 
 Uninstalls of other (non-monitoring) apps are still recorded in the link log and Watcher's ten-message box, without sending untoggled SMS.
@@ -108,33 +102,30 @@ An app that has already been removed cannot send its own alert. Uninstall and st
 
 Disable and force-stop are not announced to an app that is not running. Each app looks those up at boot and about once an hour. Opening an app, or the accessibility service connecting, also runs one check for that process. That hourly job is a short piece of work Android can batch, including a little later while the phone is asleep. It is not a continuous loop, and there is no foreground service for it. A loop that kept checking would drain the battery. This does not.
 
-The same check sends a ping to the other app and logs whether a reply comes back. Logcat tags are `TakeABreak` and `Watcher`. The controller Debug screen and the watcher screen show those lines. The ping is not an SMS, and it is not one of the ten stored messages. Both apps must be signed with the same key, which they are when built from this project, or the ping, config sync, and message box are rejected.
+The same check sends a ping to the other app and logs whether a reply comes back. Logcat tags are `TakeABreak` and `Watcher`. In **debug builds**, the controller Debug screen and the Watcher screen show those lines, and the Watcher message box shows the last ten alerts the controller has sent it. In **release builds**, the controller Debug screen is excluded and **the Watcher app has no visible logs** (no Messages list, no Link log, and no Test SMS box — only status and Setup & Permissions). The ping is not an SMS, and it is not one of the ten stored messages. Both apps must be signed with the same key, which they are when built from this project, or the ping, config sync, and message box are rejected.
 
-The watcher message box loads the last ten alerts the controller has sent it.
+## Debug vs Release builds
 
-## Planned
+Debug-only tools are separated using Gradle `src/debug/` and `src/release/` source sets so they are completely excluded from release APKs:
 
-What is still missing:
-
-- No alert when device admin is turned off. Disabling the app itself or turning off the accessibility service is covered.
+- **Take a Break (`:takeabreak`)**
+  - **Debug:** Includes the PIN-gated **Debug** button and `DebugActivity` (`takeabreak/src/debug/`).
+  - **Release:** Omits the **Debug** button, `DebugActivity`, and its manifest entry (`takeabreak/src/release/`).
+- **Take a Break Watcher (`:takeabreak-watcher`)**
+  - **Debug:** Shows **Messages from Take a Break**, **Link log**, and the **Test SMS** box (`takeabreak-watcher/src/debug/`).
+  - **Release:** Has **no visible logs** and no Test SMS box (`takeabreak-watcher/src/release/`); shows only the monitoring status and **Watcher Setup & Permissions**.
 
 ## Building
 
 1. Open this folder in Android Studio.
 2. Let Gradle sync.
-3. Build `:takeabreak:assembleDebug` and `:takeabreak-watcher:assembleDebug`.
-4. APKs are in each module's `build/outputs/apk/debug/` folder.
+3. For development/testing with debug tools, build `:takeabreak:assembleDebug` and `:takeabreak-watcher:assembleDebug` (APKs in `build/outputs/apk/debug/`).
+4. For user testing / distribution without debug tools or visible Watcher logs:
+   - Copy `keystore.properties.example` to `keystore.properties` (git-ignored) and point it at your shared release keystore (e.g., `release.keystore`, also git-ignored).
+   - Build `:takeabreak:assembleRelease` and `:takeabreak-watcher:assembleRelease` (signed APKs in `build/outputs/apk/release/`).
+   - Both modules read the same `keystore.properties`, ensuring both release APKs are signed with the same key so signature-protected broadcasts between Take a Break and Watcher succeed. Uninstall any debug builds from the phone before installing release builds signed with a different key.
 
 The apps require Android 8.0 (API 26) or newer. Compile SDK and target SDK are 34. UI is built in code with platform views.
-
-## Device owner (optional)
-
-```bash
-adb install takeabreak-debug.apk
-adb shell dpm set-device-owner com.takeabreak.controller/.DeviceAdminReceiver
-```
-
-Device owner can be set on a device with no accounts, usually right after setup or a factory reset.
 
 ## Permissions
 
@@ -154,8 +145,12 @@ Device owner can be set on a device with no accounts, usually right after setup 
 ## On the phone
 
 1. Install both apps.
-2. Open Take a Break and set the PIN.
-3. On Android 13+ / GrapheneOS, if Accessibility is grayed out as a restricted setting, tap **Allow Restricted Settings (Setup Help)** on the home screen to open App Info and allow restricted settings.
-4. Enable the Take a Break accessibility service (the Android shortcut toggle does not need to be enabled).
-5. Choose locked apps and any daily limits.
-6. Open **Text Message Alerts** (PIN required), enter the alert phone number, choose which alerts to enable (including the daily status check time), and grant SMS permission. Open Take a Break Watcher once and grant SMS permission there too if you want tamper alerts when Take a Break is removed.
+2. Open **Take a Break** and set the PIN. The **Setup & Permissions** screen opens automatically:
+   - **Step 1 (Accessibility Service):** Tap **Open Accessibility Settings** and tap **Take a Break**. On Android 13+ / GrapheneOS, dismiss the "Restricted setting" popup if shown — doing this once unlocks Restricted Settings in App Info.
+   - **Step 2 (Restricted Settings):** Tap **Restricted Settings Help & App Info** → **Open App Info**, open the `⋮` menu (or scroll down on GrapheneOS), and enable **Allow restricted settings**. Then return to Step 1 to turn on **Take a Break** (the Android shortcut toggle does not need to be enabled).
+   - **Step 3 (SMS Permission):** Tap **Grant SMS Permission** (for alert texts).
+3. Choose locked apps and any daily limits, then open **Text Message Alerts** (PIN required) to enter the alert phone number and choose which alerts to enable (including the daily status check time).
+4. Open **Take a Break Watcher**. Its **Watcher Setup & Permissions** screen opens automatically:
+   - **Step 1 (SMS Permission):** Tap **Grant SMS Permission** first (on Android 13+ / GrapheneOS, attempting this once unlocks Restricted Settings in App Info if blocked).
+   - **Step 2 (Restricted Settings):** If Step 1 was blocked, tap **Restricted Settings Help & App Info** → **Open App Info**, enable **Allow restricted settings**, then return to Step 1 to grant SMS permission.
+5. Both setup screens remain accessible anytime via **Setup & Permissions** on each app's main screen.

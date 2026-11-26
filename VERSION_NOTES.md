@@ -2,6 +2,34 @@
 
 Newest first. Version 1.0 is reserved until the owner decides the apps are ready.
 
+## 0.12.1 (2026-11-25)
+
+- **Version 0.12.1** (versionCode 121) on both apps.
+- **Fixed Restricted Settings shortcut on Android 13+ / GrapheneOS:** Replaced direct `ACTION_APPLICATION_DETAILS_SETTINGS` launches (where Android hides the `⋮ → Allow restricted settings` option) with **Open Apps Settings** (`ACTION_MANAGE_ALL_APPLICATIONS_SETTINGS`, falling back to `ACTION_APPLICATION_SETTINGS` → `ACTION_SETTINGS`) and updated instructions across both apps so selecting the app from All apps shows the `⋮` menu.
+- **Screen 4 (Take a Break Setup):** Added all four SMS alert toggles (**New app installed**, **Tamper/disabled/accessibility off**, **PIN entered to unlock a blocked app**, and **Once-a-day status check**) plus the **Scheduled time / Change Time** picker during first-time setup (still PIN-protected on post-setup revisits).
+- **Screens 7 & 8 (Take a Break Setup):** Updated un-blockable apps text to *"Apps like Phone and Settings cannot be blocked."* (removed Camera due to device inconsistency and included the note on Screen 8 as well).
+- Files: PermissionsSetupActivity.kt, SmsAlertsActivity.kt, MainActivity.kt, strings.xml, build.gradle.kts. Watcher: PermissionsSetupActivity.kt, DebugPanel.kt, MainActivity.kt, build.gradle.kts. Docs: README.md, VERSION_NOTES.md.
+
+## 0.12.0 (2026-11-25)
+
+- **Version 0.12.0** (versionCode 120) on both apps.
+- **Rebuilt multi-step setup wizards for both apps** (not locked to portrait orientation; preserves state across rotation; existing upgraded installs skip the first-time wizard):
+  - **Take a Break (`PermissionsSetupActivity`):** 8-step first-time setup flow (`Welcome` → `Enable Accessibility Service` → `Restricted Settings` if needed → `SMS Permission & optional country-coded auto-dashed phone number` → `Mandatory Watcher check & handshake` → `Set a PIN` → `Set Up App Blocking` with Skip/Save → `Set Up Time Limits` with Back, Skip/Save, and empty-selection warning). Reopening **Setup & Permissions** from the home screen walks through Screens 2–5 only and blocks phone number edits without the PIN.
+  - **Take a Break Watcher (`PermissionsSetupActivity`):** 3-step setup flow (`1B: Grant SMS Permission` — skips straight to 3B if already granted → `2B: Restricted Settings` if blocked → `3B: Watcher is Set Up.` which signals Take a Break via setup-complete `PONG` and returns to Take a Break).
+  - **Home screens:** Added a note on both apps' home screens when no alert phone number is configured, indicating that a PIN is required under **Text Message Alerts** to set up or change the number.
+  - **Accessibility description:** Moved the note that Android's shortcut option should not be enabled / is not needed to the beginning of the Accessibility Service description.
+- Files: PermissionsSetupActivity.kt, MainActivity.kt, Prefs.kt, PeerLink.kt, PeerMessageReceiver.kt, PinSetupActivity.kt, AndroidManifest.xml, strings.xml, build.gradle.kts. Watcher: PermissionsSetupActivity.kt, MainActivity.kt, PeerLink.kt, strings.xml, build.gradle.kts. Docs: README.md, VERSION_NOTES.md.
+
+## 0.11.1 (2026-11-23)
+
+- **Version 0.11.1** (versionCode 111) on both apps.
+- **Fixed: SMS notification for PIN entry on a blocked app did not fire for PIN-locked apps.** Previously, `AppLockAccessibilityService.handlePinAccepted` only sent an alert for `TIME_UP` (time-limit reached) unlocks and ignored `PIN_LOCK` unlocks. Entering the PIN on any blocked app now sends an alert (`ALERT: PIN entered to unlock <App>.` for PIN-locked apps and `ALERT: PIN entered to unlock <App> for the rest of the day.` for time-limited apps) when the toggle (**PIN is entered to unlock a blocked app**) is enabled, still subject to the 5-minute duplicate suppression and rate limits.
+- **Dedicated Setup & Permissions screen (`PermissionsSetupActivity`) for BOTH apps on fresh install (and accessible anytime afterward for reconfiguring).** Step order now matches Android 13+ / GrapheneOS behavior where Android hides "Allow restricted settings" in App Info until a restricted setting/permission is attempted once first, with a single **Restricted Settings Help & App Info** button (no duplicate buttons):
+  - **Take a Break:** First-time PIN setup flows directly into **Setup & Permissions** (`Step 1: Accessibility Service` → `Step 2: Restricted Settings Help & App Info` → `Step 3: SMS Permission`), and the home screen includes a **Setup & Permissions** button to reopen it anytime. **Text Message Alerts** also shows **Grant SMS Permission** before **Restricted Settings Help & App Info**.
+  - **Take a Break Watcher:** Fresh installs open **Watcher Setup & Permissions** (`Step 1: Enable SMS Permission` → `Step 2: Restricted Settings Help & App Info`), and the main screen includes a **Watcher Setup & Permissions** button to reopen it anytime.
+- **Removed optional Device Admin support** (`DeviceAdminReceiver`, `device_admin.xml`, `BIND_DEVICE_ADMIN` receiver declaration, and Setup step) to keep Take a Break focused on voluntary usage restrictions without full device-admin privileges.
+- Files: PermissionsSetupActivity.kt (new), AppLockAccessibilityService.kt, PeerLink.kt, Prefs.kt, PinSetupActivity.kt, MainActivity.kt, SmsAlertsActivity.kt, AndroidManifest.xml, strings.xml, build.gradle.kts; deleted DeviceAdminReceiver.kt, device_admin.xml. Watcher: PermissionsSetupActivity.kt (new), MainActivity.kt, AndroidManifest.xml, strings.xml, build.gradle.kts. Docs: README.md, VERSION_NOTES.md.
+
 ## 0.11.0 (2026-11-23)
 
 - **Version 0.11.0** (versionCode 110) on both apps.

@@ -517,15 +517,23 @@ class AppLockAccessibilityService : AccessibilityService() {
     // ------------------------------------------------------------------ button results from the overlay
 
     private fun handlePinAccepted(pkg: String, decision: Decision) {
-        if (pkg in visiblePkgs) {
-            // Entering the PIN on the "time up" screen = unlock for the rest of today.
-            if (decision == Decision.TIME_UP) {
+        val label = appLabel(pkg)
+        when (decision) {
+            Decision.TIME_UP -> {
                 val alreadyUnlocked = Prefs.isDayUnlocked(this, pkg)
                 Prefs.setDayUnlocked(this, pkg)
                 if (!alreadyUnlocked) {
-                    PeerLink.reportDayUnlock(this, appLabel(pkg))
+                    PeerLink.reportPinUnlock(this, label, forRestOfDay = true)
                 }
             }
+            Decision.PIN_LOCK -> {
+                if (pkg !in pinPassedPkgs) {
+                    PeerLink.reportPinUnlock(this, label, forRestOfDay = false)
+                }
+            }
+            Decision.ALLOW -> Unit
+        }
+        if (pkg in visiblePkgs) {
             pinPassedPkgs.add(pkg)
         }
         enforce()

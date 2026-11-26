@@ -14,3 +14,7 @@ captures/
 *.dex
 *.class
 *.hprof
+/keystore.properties
+*.jks
+*.keystore
+!debug.keystore

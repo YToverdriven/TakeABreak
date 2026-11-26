@@ -1,7 +1,7 @@
 package com.takeabreak.controller
 
 import android.Manifest
-import android.app.Activity
+import android.app.AlertDialog
 import android.app.TimePickerDialog
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -9,9 +9,11 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.provider.Settings
 import android.text.InputType
 import android.text.format.DateFormat
 import android.view.Gravity
+import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -26,9 +28,10 @@ import java.util.Calendar
  * PIN-gated configuration page for SMS alerts: destination phone number, per-event toggles,
  * daily status check time (default 8:00 PM), SMS permission, and retry queue status.
  */
-class SmsAlertsActivity : Activity() {
+class SmsAlertsActivity : PinLockedActivity() {
     private lateinit var phoneInput: EditText
     private lateinit var statusView: TextView
+    private lateinit var restrictedBtn: Button
     private lateinit var permBtn: Button
     private lateinit var testBtn: Button
     private lateinit var dailyTimeLabel: TextView
@@ -66,6 +69,7 @@ class SmsAlertsActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (isLockedOut) return
 
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -108,6 +112,11 @@ class SmsAlertsActivity : Activity() {
             }
         }
 
+        restrictedBtn = Button(this).apply {
+            text = getString(R.string.restricted_settings_help_button)
+            setOnClickListener { showSmsRestrictedHelp() }
+        }
+
         testBtn = Button(this).apply {
             text = "Send Test SMS"
             setOnClickListener { sendTestSms() }
@@ -137,7 +146,7 @@ class SmsAlertsActivity : Activity() {
         }
 
         val dayUnlockCb = CheckBox(this).apply {
-            text = "PIN is entered to unlock an app for the rest of the day"
+            text = "PIN is entered to unlock a blocked app"
             isChecked = Prefs.isAlertDayUnlockEnabled(this@SmsAlertsActivity)
             setOnCheckedChangeListener { _, checked ->
                 Prefs.setAlertDayUnlockEnabled(this@SmsAlertsActivity, checked)
@@ -191,6 +200,7 @@ class SmsAlertsActivity : Activity() {
         column.addView(phoneInput)
         column.addView(saveNumberBtn)
         column.addView(permBtn)
+        column.addView(restrictedBtn)
         column.addView(testBtn)
         column.addView(togglesHeader)
         column.addView(newAppCb)
@@ -223,7 +233,7 @@ class SmsAlertsActivity : Activity() {
             toast("SMS permission granted")
             SmsAlerts.processQueue(this)
         } else {
-            toast("SMS permission was not granted")
+            showSmsRestrictedHelp()
         }
         refreshStatus()
     }
@@ -287,18 +297,20 @@ class SmsAlertsActivity : Activity() {
         val hour = Prefs.getDailyStatusHour(this)
         val minute = Prefs.getDailyStatusMinute(this)
         val is24Hour = DateFormat.is24HourFormat(this)
-        TimePickerDialog(
-            this,
-            { _, selectedHour, selectedMinute ->
-                Prefs.setDailyStatusTime(this, selectedHour, selectedMinute)
-                DailyStatusWorker.syncSchedule(this)
-                refreshDailyTimeUi()
-                toast("Daily status time set to ${formatTime(selectedHour, selectedMinute)}")
-            },
-            hour,
-            minute,
-            is24Hour
-        ).show()
+        showManagedDialog(
+            TimePickerDialog(
+                this,
+                { _, selectedHour, selectedMinute ->
+                    Prefs.setDailyStatusTime(this, selectedHour, selectedMinute)
+                    DailyStatusWorker.syncSchedule(this)
+                    refreshDailyTimeUi()
+                    toast("Daily status time set to ${formatTime(selectedHour, selectedMinute)}")
+                },
+                hour,
+                minute,
+                is24Hour,
+            ),
+        )
     }
 
     private fun refreshDailyTimeUi() {
@@ -323,10 +335,43 @@ class SmsAlertsActivity : Activity() {
         val hasPerm = ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) ==
             PackageManager.PERMISSION_GRANTED
         val hasNumber = Prefs.isValidPhoneNumber(Prefs.getSmsPhoneNumber(this))
+        restrictedBtn.visibility = if (hasPerm) View.GONE else View.VISIBLE
         permBtn.text = if (hasPerm) "SMS Permission: Granted" else "Grant SMS Permission"
         permBtn.isEnabled = !hasPerm
         testBtn.isEnabled = hasNumber
         statusView.text = SmsAlerts.statusSummary(this)
+    }
+
+    private fun openAppsSettings() {
+        val allAppsIntent = Intent(Settings.ACTION_MANAGE_ALL_APPLICATIONS_SETTINGS)
+        val appsIntent = Intent(Settings.ACTION_APPLICATION_SETTINGS)
+        try {
+            startActivity(allAppsIntent)
+            toast("Tap Take a Break, then tap ⋮ menu (or scroll down) and enable 'Allow restricted settings'")
+        } catch (_: Exception) {
+            try {
+                startActivity(appsIntent)
+                toast("Open All apps → Take a Break, then tap ⋮ menu and enable 'Allow restricted settings'")
+            } catch (_: Exception) {
+                startActivity(Intent(Settings.ACTION_SETTINGS))
+            }
+        }
+    }
+
+    private fun showSmsRestrictedHelp() {
+        showManagedDialog(
+            AlertDialog.Builder(this)
+                .setTitle("SMS Permission Blocked?")
+                .setMessage(
+                    "On Android 13+ and GrapheneOS, Android hides \"Allow restricted settings\" if App Info is opened directly. You must open it from Settings → Apps → All apps:\n\n" +
+                        "1. Tap Open Apps Settings below (or go to Settings → Apps → See all apps) and select Take a Break.\n" +
+                        "2. Tap the ⋮ menu in the top-right corner (or scroll down) and enable Allow restricted settings.\n" +
+                        "3. Return here and tap Grant SMS Permission (or enable SMS under Permissions → SMS)."
+                )
+                .setPositiveButton("Open Apps Settings") { _, _ -> openAppsSettings() }
+                .setNegativeButton("Close", null)
+                .create(),
+        )
     }
 
     private fun toast(message: String) {

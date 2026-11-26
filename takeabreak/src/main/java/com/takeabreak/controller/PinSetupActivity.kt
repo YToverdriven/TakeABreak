@@ -1,7 +1,5 @@
 package com.takeabreak.controller
 
-import android.app.Activity
-import android.content.Intent
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
@@ -13,8 +11,10 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 
-class PinSetupActivity : Activity() {
+class PinSetupActivity : PinLockedActivity() {
     private var isFirstSetup = false
+
+    override fun requiresPinLock(): Boolean = Prefs.isPinSet(this)
 
     override fun onResume() {
         super.onResume()
@@ -23,6 +23,7 @@ class PinSetupActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (isLockedOut) return
         isFirstSetup = !Prefs.isPinSet(this)
         if (!isFirstSetup) {
             showOldPinGate()
@@ -109,9 +110,6 @@ class PinSetupActivity : Activity() {
                 }
                 Prefs.setPin(this@PinSetupActivity, pin)
                 Toast.makeText(this@PinSetupActivity, "PIN saved", Toast.LENGTH_SHORT).show()
-                if (isFirstSetup) {
-                    startActivity(Intent(this@PinSetupActivity, MainActivity::class.java))
-                }
                 finish()
             }
         }

@@ -20,7 +20,10 @@ class PeerMessageReceiver : BroadcastReceiver() {
         val reason = intent.getStringExtra(PeerLink.EXTRA_REASON).orEmpty()
         when (intent.action) {
             PeerLink.ACTION_PING -> PeerLink.onPing(context, from, reason)
-            PeerLink.ACTION_PONG -> PeerLink.onPong(context, from, reason)
+            PeerLink.ACTION_PONG -> {
+                val setupComplete = intent.getBooleanExtra(PeerLink.EXTRA_SETUP_COMPLETE, false)
+                PeerLink.onPong(context, from, reason, setupComplete)
+            }
         }
     }
 }

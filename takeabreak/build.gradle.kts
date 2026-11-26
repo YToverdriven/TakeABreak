@@ -1,9 +1,9 @@
+import java.io.File
+import java.util.Properties
+
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
 }
-
-layout.buildDirectory.set(rootProject.layout.projectDirectory.dir("app/build"))
 
 android {
     namespace = "com.takeabreak.controller"
@@ -13,24 +13,59 @@ android {
         applicationId = "com.takeabreak.controller"
         minSdk = 26
         targetSdk = 34
-        versionCode = 110
-        versionName = "0.11.0"
+        versionCode = 121
+        versionName = "0.12.1"
     }
 
+    val keystorePropsFile = rootProject.file("keystore.properties")
+    val keystoreProps = Properties().apply {
+        if (keystorePropsFile.isFile) {
+            keystorePropsFile.inputStream().use { load(it) }
+        }
+    }
+    val releaseStorePath = keystoreProps.getProperty("storeFile")?.trim().orEmpty()
+    val releaseStoreFile = releaseStorePath
+        .takeIf { it.isNotEmpty() }
+        ?.let { path -> File(path).takeIf { it.isAbsolute } ?: rootProject.file(path) }
+    val releaseStorePassword = keystoreProps.getProperty("storePassword")?.trim().orEmpty()
+    val releaseKeyAlias = keystoreProps.getProperty("keyAlias")?.trim().orEmpty()
+    val releaseKeyPassword = keystoreProps.getProperty("keyPassword")?.trim().orEmpty()
+    val hasReleaseSigning = (releaseStoreFile != null) &&
+        releaseStoreFile.isFile &&
+        releaseStorePassword.isNotEmpty() &&
+        releaseKeyAlias.isNotEmpty() &&
+        releaseKeyPassword.isNotEmpty()
+
+    val projectDebugKeystore = file("${rootDir}/debug.keystore")
     signingConfigs {
-        create("debugConfig") {
-            storeFile = file("${rootDir}/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+        if (projectDebugKeystore.exists()) {
+            create("debugConfig") {
+                storeFile = projectDebugKeystore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = releaseStoreFile
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
         }
     }
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("debugConfig")
+            if (projectDebugKeystore.exists()) {
+                signingConfig = signingConfigs.getByName("debugConfig")
+            }
         }
         release {
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

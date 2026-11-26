@@ -31,6 +31,9 @@ object Prefs {
     private const val KEY_DAILY_STATUS_MINUTE = "daily_status_minute"
     private const val KEY_LAST_DAILY_STATUS_DATE = "last_daily_status_date"
     private const val KEY_DEBUG_NOTE = "debug_note"
+    private const val KEY_SETUP_COMPLETE = "setup_complete"
+    private const val KEY_SETUP_IN_PROGRESS = "setup_in_progress"
+    private const val KEY_SETUP_STEP = "setup_step"
 
     const val DEFAULT_DAILY_STATUS_HOUR = 20
     const val DEFAULT_DAILY_STATUS_MINUTE = 0
@@ -41,6 +44,33 @@ object Prefs {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     fun isPinSet(context: Context): Boolean = prefs(context).contains(KEY_PIN_HASH)
+
+    fun isSetupComplete(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_SETUP_COMPLETE, false)
+
+    fun setSetupComplete(context: Context, complete: Boolean) {
+        prefs(context).edit {
+            putBoolean(KEY_SETUP_COMPLETE, complete)
+            if (complete) {
+                putBoolean(KEY_SETUP_IN_PROGRESS, false)
+                remove(KEY_SETUP_STEP)
+            }
+        }
+    }
+
+    fun isSetupInProgress(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_SETUP_IN_PROGRESS, false)
+
+    fun setSetupInProgress(context: Context, inProgress: Boolean) {
+        prefs(context).edit { putBoolean(KEY_SETUP_IN_PROGRESS, inProgress) }
+    }
+
+    fun getSetupStep(context: Context): Int =
+        prefs(context).getInt(KEY_SETUP_STEP, 1)
+
+    fun setSetupStep(context: Context, step: Int) {
+        prefs(context).edit { putInt(KEY_SETUP_STEP, step) }
+    }
 
     fun setPin(context: Context, pin: String) {
         prefs(context).edit { putString(KEY_PIN_HASH, hashPin(pin)) }

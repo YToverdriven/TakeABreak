@@ -1,6 +1,5 @@
 package com.takeabreak.controller
 
-import android.app.Activity
 import android.os.Bundle
 import android.view.Gravity
 import android.widget.Button
@@ -9,7 +8,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 
-class AppSelectorActivity : Activity() {
+class AppSelectorActivity : PinLockedActivity() {
     private val selected = mutableSetOf<String>()
     private lateinit var container: LinearLayout
 
@@ -20,6 +19,7 @@ class AppSelectorActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (isLockedOut) return
 
         ProtectedPackages.invalidate()
         selected.addAll(
@@ -80,13 +80,7 @@ class AppSelectorActivity : Activity() {
     }
 
     private fun loadApps() {
-        val pm = packageManager
-        val apps = pm.getInstalledApplications(0)
-            .asSequence()
-            .filter { AppList.canControl(this, it, emptySet()) }
-            .map { app -> app.packageName to pm.getApplicationLabel(app).toString() }
-            .sortedBy { (_, label) -> label.lowercase() }
-            .toList()
+        val apps = AppList.controllableApps(this)
 
         for ((pkg, label) in apps) {
             val row = LinearLayout(this).apply {

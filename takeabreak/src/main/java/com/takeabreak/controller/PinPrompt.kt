@@ -14,7 +14,7 @@ import android.widget.Toast
  * opened and the first tap can be a digit.
  */
 object PinPrompt {
-    fun show(activity: Activity, onSuccess: () -> Unit) {
+    fun show(activity: Activity, onSuccess: () -> Unit): AlertDialog {
         val entered = StringBuilder()
         val dots = TextView(activity).apply {
             text = " "
@@ -89,5 +89,6 @@ object PinPrompt {
             .setNegativeButton("Cancel", null)
             .create()
         dialog.show()
+        return dialog
     }
 }

@@ -38,8 +38,10 @@ object PeerLink {
     const val ACTION_PING = "com.takeabreak.peer.PING"
     const val ACTION_PONG = "com.takeabreak.peer.PONG"
     const val ACTION_LOG_UPDATED = "com.takeabreak.peer.LOG_UPDATED"
+    const val ACTION_WATCHER_SETUP_UPDATED = "com.takeabreak.peer.WATCHER_SETUP_UPDATED"
     const val EXTRA_FROM = "from"
     const val EXTRA_REASON = "reason"
+    const val EXTRA_SETUP_COMPLETE = "setup_complete"
     const val ALERT_ACCESSIBILITY_OFF = "ALERT: Take a Break accessibility service was turned off!"
     private const val PERMISSION = "com.takeabreak.permission.POST_MESSAGE"
 
@@ -49,12 +51,14 @@ object PeerLink {
     private const val KEY_ACCESSIBILITY = "accessibility_state"
     private const val KEY_PING_AT = "ping_at"
     private const val KEY_PONG_AT = "pong_at"
+    private const val KEY_WATCHER_SETUP_COMPLETE = "watcher_setup_complete"
+    private const val KEY_WATCHER_SETUP_AT = "watcher_setup_at"
     private const val KEY_LOG = "log"
     private const val WORK = "peer_check"
     private const val MAX_LOG = 12
 
     private enum class State { MISSING, DISABLED, STOPPED, OK }
-    private enum class AlertType { NEW_APP, OTHER_UNINSTALL, TAMPER, DAY_UNLOCK, DAILY_STATUS }
+    private enum class AlertType { NEW_APP, OTHER_UNINSTALL, TAMPER, PIN_UNLOCK, DAILY_STATUS }
 
     @Volatile
     private var checkedThisProcess = false
@@ -73,16 +77,16 @@ object PeerLink {
     /** Boot, the accessibility service, or the first time this process opens a screen. */
     @Synchronized
     fun check(context: Context, reason: String) {
-        if (reason != "hourly") {
-            if (checkedThisProcess) return
-            checkedThisProcess = true
-        }
         val app = context.applicationContext
-        checkAccessibility(app, reason)
-        SmsAlerts.processQueue(app)
         val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val state = inspect(app)
         val previous = prefs.getString(KEY_STATE, null)
+        if (reason != "hourly") {
+            if (checkedThisProcess && (previous == state.name)) return
+            checkedThisProcess = true
+        }
+        checkAccessibility(app, reason)
+        SmsAlerts.processQueue(app)
         log(app, "peer check ($reason): $PARTNER_LABEL is ${describe(state)}")
         val transition = messageFor(previous, state)
         if (transition != null) {
@@ -139,15 +143,16 @@ object PeerLink {
         }
     }
 
-    /** Called when PIN is entered on the time-up screen to unlock an app for the rest of today. */
+    /** Called when PIN is entered on the block screen to unlock a PIN-locked or time-limited app. */
     @Synchronized
-    fun reportDayUnlock(context: Context, appLabel: String) {
+    fun reportPinUnlock(context: Context, appLabel: String, forRestOfDay: Boolean) {
         val app = context.applicationContext
-        deliver(
-            app,
-            AlertType.DAY_UNLOCK,
+        val message = if (forRestOfDay) {
             "ALERT: PIN entered to unlock $appLabel for the rest of the day."
-        )
+        } else {
+            "ALERT: PIN entered to unlock $appLabel."
+        }
+        deliver(app, AlertType.PIN_UNLOCK, message)
     }
 
     /** Called by [DailyStatusWorker] for the scheduled once-a-day status SMS. */
@@ -163,6 +168,41 @@ object PeerLink {
         State.MISSING -> "not installed"
     }
 
+    fun isWatcherInstalled(context: Context): Boolean {
+        val state = inspect(context.applicationContext)
+        return (state != State.MISSING) && (state != State.DISABLED)
+    }
+
+    fun isWatcherDisabled(context: Context): Boolean =
+        inspect(context.applicationContext) == State.DISABLED
+
+    /**
+     * Pings Take a Break Watcher during setup to check whether Watcher has completed its
+     * SMS permissions setup, and syncs the current SMS configuration.
+     */
+    @Synchronized
+    fun probeWatcherSetup(context: Context) {
+        val app = context.applicationContext
+        val state = inspect(app)
+        if ((state == State.MISSING) || (state == State.DISABLED)) {
+            app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+                putBoolean(KEY_WATCHER_SETUP_COMPLETE, false)
+            }
+            return
+        }
+        WatcherMessages.syncConfig(app)
+        send(app, ACTION_PING, "setup_check")
+    }
+
+    @Synchronized
+    fun notePartnerAlive(context: Context) {
+        val app = context.applicationContext
+        val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (prefs.getString(KEY_STATE, null) != State.OK.name) {
+            prefs.edit { putString(KEY_STATE, State.OK.name) }
+        }
+    }
+
     @Synchronized
     fun onPing(context: Context, from: String, reason: String) {
         val app = context.applicationContext
@@ -170,22 +210,34 @@ object PeerLink {
             log(app, "peer check: ignored ping from $from")
             return
         }
+        notePartnerAlive(app)
         log(app, "peer check: ping received from $PARTNER_LABEL reason=$reason")
         WatcherMessages.syncConfig(app)
         send(app, ACTION_PONG, reason)
     }
 
     @Synchronized
-    fun onPong(context: Context, from: String, reason: String) {
+    fun onPong(context: Context, from: String, reason: String, setupComplete: Boolean = false) {
         val app = context.applicationContext
         if (from != PARTNER) {
             log(app, "peer check: ignored pong from $from")
             return
         }
+        notePartnerAlive(app)
+        val now = System.currentTimeMillis()
         app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
-            putLong(KEY_PONG_AT, System.currentTimeMillis())
+            putLong(KEY_PONG_AT, now)
+            putBoolean(KEY_WATCHER_SETUP_COMPLETE, setupComplete)
+            putLong(KEY_WATCHER_SETUP_AT, now)
         }
-        log(app, "peer check: pong received from $PARTNER_LABEL reason=$reason")
+        log(app, "peer check: pong received from $PARTNER_LABEL reason=$reason setupComplete=$setupComplete")
+        Handler(Looper.getMainLooper()).post {
+            app.sendBroadcast(
+                Intent(ACTION_WATCHER_SETUP_UPDATED)
+                    .setPackage(app.packageName)
+                    .putExtra(EXTRA_SETUP_COMPLETE, setupComplete),
+            )
+        }
     }
 
     @Synchronized
@@ -196,6 +248,14 @@ object PeerLink {
         val replacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
         when (intent.action) {
             Intent.ACTION_PACKAGE_ADDED -> {
+                if (pkg == PARTNER) {
+                    val state = inspect(app)
+                    app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+                        putString(KEY_STATE, state.name)
+                    }
+                    log(app, "peer check (package added): $PARTNER_LABEL is ${describe(state)}")
+                    WatcherMessages.syncConfig(app)
+                }
                 if (replacing) {
                     Log.i(TAG, "App updated: $pkg")
                     return
@@ -214,7 +274,10 @@ object PeerLink {
                 if (!once(app, "gone:$pkg")) return
                 if (pkg == PARTNER) {
                     Log.w(TAG, "Watcher was removed")
-                    raise(app, State.MISSING, "ALERT: $PARTNER_LABEL was uninstalled!")
+                    app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+                        putString(KEY_STATE, State.MISSING.name)
+                    }
+                    deliver(app, AlertType.TAMPER, "ALERT: $PARTNER_LABEL was uninstalled!")
                 } else {
                     Log.i(TAG, "App uninstalled: $pkg")
                     deliver(app, AlertType.OTHER_UNINSTALL, "ALERT: App uninstalled: $pkg")
@@ -273,7 +336,7 @@ object PeerLink {
         val smsAllowed = when (type) {
             AlertType.NEW_APP -> Prefs.isAlertNewAppEnabled(context)
             AlertType.TAMPER -> Prefs.isAlertTamperEnabled(context)
-            AlertType.DAY_UNLOCK -> Prefs.isAlertDayUnlockEnabled(context)
+            AlertType.PIN_UNLOCK -> Prefs.isAlertDayUnlockEnabled(context)
             AlertType.DAILY_STATUS -> Prefs.isDailyStatusEnabled(context)
             AlertType.OTHER_UNINSTALL -> false
         }

@@ -1,6 +1,5 @@
 package com.takeabreak.controller
 
-import android.app.Activity
 import android.app.AlertDialog
 import android.os.Bundle
 import android.text.InputType
@@ -11,7 +10,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 
-class UsageLimitsActivity : Activity() {
+class UsageLimitsActivity : PinLockedActivity() {
     private lateinit var container: LinearLayout
 
     override fun onResume() {
@@ -21,6 +20,7 @@ class UsageLimitsActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (isLockedOut) return
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -63,17 +63,8 @@ class UsageLimitsActivity : Activity() {
 
     private fun loadApps() {
         container.removeAllViews()
-        val pm = packageManager
-        val excluded = AppList.excludedLauncherAndImePackages(this)
         val allLimits = Prefs.getAllLimits(this)
-
-        ProtectedPackages.invalidate()
-        val apps = pm.getInstalledApplications(0)
-            .asSequence()
-            .filter { AppList.canControl(this, it, excluded) }
-            .map { app -> app.packageName to pm.getApplicationLabel(app).toString() }
-            .sortedBy { (_, label) -> label.lowercase() }
-            .toList()
+        val apps = AppList.controllableApps(this)
 
         for ((pkg, label) in apps) {
             val currentMin = allLimits[pkg] ?: 0
@@ -124,23 +115,25 @@ class UsageLimitsActivity : Activity() {
         inputLayout.addView(TextView(this).apply { text = "  " })
         inputLayout.addView(minEt)
 
-        AlertDialog.Builder(this)
-            .setTitle("Set limit for $label")
-            .setView(inputLayout)
-            .setPositiveButton("Set") { _, _ ->
-                val h = hoursEt.text.toString().toIntOrNull() ?: 0
-                val m = minEt.text.toString().toIntOrNull() ?: 0
-                val total = ((h * 60) + m).coerceIn(0, (23 * 60) + 59)
-                Prefs.setLimitMinutes(this, pkg, total)
-                Toast.makeText(this, if (total > 0) "Limit set" else "Limit cleared", Toast.LENGTH_SHORT).show()
-                loadApps() // refresh list so limit shows under the app
-            }
-            .setNegativeButton("Cancel", null)
-            .setNeutralButton("Clear") { _, _ ->
-                Prefs.setLimitMinutes(this, pkg, 0)
-                Toast.makeText(this, "Limit cleared", Toast.LENGTH_SHORT).show()
-                loadApps()
-            }
-            .show()
+        showManagedDialog(
+            AlertDialog.Builder(this)
+                .setTitle("Set limit for $label")
+                .setView(inputLayout)
+                .setPositiveButton("Set") { _, _ ->
+                    val h = hoursEt.text.toString().toIntOrNull() ?: 0
+                    val m = minEt.text.toString().toIntOrNull() ?: 0
+                    val total = ((h * 60) + m).coerceIn(0, (23 * 60) + 59)
+                    Prefs.setLimitMinutes(this, pkg, total)
+                    Toast.makeText(this, if (total > 0) "Limit set" else "Limit cleared", Toast.LENGTH_SHORT).show()
+                    loadApps() // refresh list so limit shows under the app
+                }
+                .setNegativeButton("Cancel", null)
+                .setNeutralButton("Clear") { _, _ ->
+                    Prefs.setLimitMinutes(this, pkg, 0)
+                    Toast.makeText(this, "Limit cleared", Toast.LENGTH_SHORT).show()
+                    loadApps()
+                }
+                .create(),
+        )
     }
 }

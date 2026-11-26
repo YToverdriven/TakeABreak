@@ -37,6 +37,7 @@ object PeerLink {
     const val ACTION_LOG_UPDATED = "com.takeabreak.peer.LOG_UPDATED"
     const val EXTRA_FROM = "from"
     const val EXTRA_REASON = "reason"
+    const val EXTRA_SETUP_COMPLETE = "setup_complete"
     const val ALERT_ACCESSIBILITY_OFF = "ALERT: Take a Break accessibility service was turned off!"
     private const val PERMISSION = "com.takeabreak.permission.POST_MESSAGE"
 
@@ -67,15 +68,15 @@ object PeerLink {
     /** Boot, or the first time this process opens the screen. Hourly always runs. */
     @Synchronized
     fun check(context: Context, reason: String) {
-        if (reason != "hourly") {
-            if (checkedThisProcess) return
-            checkedThisProcess = true
-        }
         val app = context.applicationContext
-        SmsAlerts.processQueue(app)
         val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val state = inspect(app)
         val previous = prefs.getString(KEY_STATE, null)
+        if (reason != "hourly") {
+            if (checkedThisProcess && (previous == state.name)) return
+            checkedThisProcess = true
+        }
+        SmsAlerts.processQueue(app)
         val accEnabled = if ((state == State.OK) || (state == State.STOPPED)) {
             isControllerAccessibilityEnabled(app)
         } else {
@@ -157,12 +158,37 @@ object PeerLink {
     }
 
     @Synchronized
+    fun notePartnerAlive(context: Context) {
+        val app = context.applicationContext
+        val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (prefs.getString(KEY_STATE, null) != State.OK.name) {
+            prefs.edit { putString(KEY_STATE, State.OK.name) }
+        }
+    }
+
+    fun isWatcherSetupReady(context: Context): Boolean {
+        val app = context.applicationContext
+        return PermissionsSetupActivity.isSetupComplete(app) &&
+            PermissionsSetupActivity.hasSmsPermission(app)
+    }
+
+    /** Proactively sends a setup-complete pong to Take a Break once Watcher setup finishes. */
+    @Synchronized
+    fun notifySetupComplete(context: Context) {
+        val app = context.applicationContext
+        val state = inspect(app)
+        if ((state == State.MISSING) || (state == State.DISABLED)) return
+        send(app, ACTION_PONG, "setup_complete")
+    }
+
+    @Synchronized
     fun onPing(context: Context, from: String, reason: String) {
         val app = context.applicationContext
         if (from != PARTNER) {
             log(app, "peer check: ignored ping from $from")
             return
         }
+        notePartnerAlive(app)
         log(app, "peer check: ping received from $PARTNER_LABEL reason=$reason")
         send(app, ACTION_PONG, reason)
     }
@@ -174,6 +200,7 @@ object PeerLink {
             log(app, "peer check: ignored pong from $from")
             return
         }
+        notePartnerAlive(app)
         app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
             putLong(KEY_PONG_AT, System.currentTimeMillis())
         }
@@ -187,6 +214,14 @@ object PeerLink {
         val app = context.applicationContext
         val replacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
         when (intent.action) {
+            Intent.ACTION_PACKAGE_ADDED -> {
+                if (pkg != PARTNER) return
+                val state = inspect(app)
+                app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+                    putString(KEY_STATE, state.name)
+                }
+                log(app, "peer check (package added): $PARTNER_LABEL is ${describe(state)}")
+            }
             Intent.ACTION_PACKAGE_REMOVED,
             Intent.ACTION_PACKAGE_FULLY_REMOVED,
             -> {
@@ -194,7 +229,11 @@ object PeerLink {
                 if (!once(app, "gone:$pkg")) return
                 if (pkg == PARTNER) {
                     Log.w(TAG, "Main app was removed")
-                    raise(app, State.MISSING, "ALERT: $PARTNER_LABEL was uninstalled!")
+                    app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+                        putString(KEY_STATE, State.MISSING.name)
+                        putString(KEY_ACCESSIBILITY, "DISABLED")
+                    }
+                    deliver(app, "ALERT: $PARTNER_LABEL was uninstalled!")
                 }
             }
             Intent.ACTION_PACKAGE_DATA_CLEARED -> {
@@ -303,6 +342,9 @@ object PeerLink {
             .putExtra(EXTRA_FROM, SELF)
             .putExtra(EXTRA_REASON, reason)
             .addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+        if (action == ACTION_PONG) {
+            intent.putExtra(EXTRA_SETUP_COMPLETE, isWatcherSetupReady(context))
+        }
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 val options = BroadcastOptions.makeBasic().apply {

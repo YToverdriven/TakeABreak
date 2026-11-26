@@ -19,6 +19,7 @@ class AlertMessageReceiver : BroadcastReceiver() {
             }
         }
         if (action == ACTION_SYNC_CONFIG) {
+            PeerLink.notePartnerAlive(context)
             val phone = intent.getStringExtra(EXTRA_PHONE).orEmpty()
             val tamperEnabled = intent.getBooleanExtra(EXTRA_TAMPER_ENABLED, true)
             SmsAlerts.applySyncedConfig(context, phone, tamperEnabled)
@@ -27,6 +28,7 @@ class AlertMessageReceiver : BroadcastReceiver() {
         }
         val text = intent.getStringExtra(EXTRA_TEXT)?.trim().orEmpty()
         if (text.isEmpty()) return
+        PeerLink.notePartnerAlive(context)
         if (text == PeerLink.ALERT_ACCESSIBILITY_OFF) {
             PeerLink.noteControllerReportedAccessibilityOff(context)
         }
