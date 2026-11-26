@@ -3,15 +3,27 @@ package com.takeabreak.controller
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.view.Gravity
-import android.widget.Button
+import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Space
 import android.widget.TextView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 
 class MainActivity : Activity() {
     private var pinDialog: AlertDialog? = null
+    private var uiBuilt = false
+
+    private lateinit var lockedCountView: TextView
+    private lateinit var limitsCountView: TextView
+    private lateinit var accNoticeView: TextView
+    private lateinit var phoneNoticeView: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,6 +42,9 @@ class MainActivity : Activity() {
                 return
             }
         }
+
+        configureSystemBars()
+        buildMainUi()
     }
 
     override fun onResume() {
@@ -39,7 +54,23 @@ class MainActivity : Activity() {
         PeerLink.check(this, "opened")
         PeerLink.checkAccessibility(this, "opened")
         dropProtectedRules()
-        showMainUi()
+        if (!uiBuilt) {
+            configureSystemBars()
+            buildMainUi()
+        }
+        refreshMainUi()
+    }
+
+    private fun configureSystemBars() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        @Suppress("DEPRECATION")
+        window.statusBarColor = Color.TRANSPARENT
+        @Suppress("DEPRECATION")
+        window.navigationBarColor = Color.TRANSPARENT
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            isAppearanceLightStatusBars = true
+            isAppearanceLightNavigationBars = true
+        }
     }
 
     /** Older saves may name an app that is no longer allowed to be blocked. */
@@ -56,112 +87,269 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun showMainUi() {
-        val layout = LinearLayout(this).apply {
+    private fun buildMainUi() {
+        uiBuilt = true
+        val dp = { value: Float -> AeroGlassUi.dp(this, value) }
+
+        val outer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(48, 48, 48, 48)
             gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(24f), dp(22f), dp(24f), dp(18f))
         }
 
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            )
+        }
+
+        // 1. Prominent tall Liquid Glass heading at the top
         val title = TextView(this).apply {
-            text = getString(R.string.main_title, appVersion())
-            textSize = 24f
-            setPadding(0, 0, 0, 32)
+            text = getString(R.string.app_name)
+            textSize = 40f
+            typeface = AeroGlassUi.tallFont(weight = 700)
+            letterSpacing = 0.015f
+            setShadowLayer(6f, 0f, 2f, 0x26157DC4)
+            AeroGlassUi.applyGlassTextGradient(
+                this,
+                topColor = 0xFF0A3956.toInt(),
+                midColor = 0xFF145E87.toInt(),
+                bottomColor = 0xFF0C4866.toInt(),
+            )
+            gravity = Gravity.CENTER
+            setPadding(0, dp(6f), 0, dp(4f))
         }
 
-        val status = TextView(this).apply {
-            text = "PIN-locked apps: ${Prefs.getLockedPackages(this@MainActivity).size}\n" +
-                "Apps with usage limits: ${Prefs.getAllLimits(this@MainActivity).size}"
-            textSize = 16f
-            setPadding(0, 0, 0, 20)
-        }
-
-        val accEnabled = isAccessibilityEnabled(this)
-        val hasPhoneNumber = Prefs.isValidPhoneNumber(Prefs.getSmsPhoneNumber(this))
-
-        val pinBtn = Button(this).apply {
-            text = "Change PIN"
-            setOnClickListener {
-                requirePinThen {
-                    startActivity(Intent(this@MainActivity, PinSetupActivity::class.java))
-                }
+        // 2. Wider double-casement sunlit window graphic centered directly beneath the title on white
+        val windowGraphic = TakeABreakWindowView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(286f), dp(208f)).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+                topMargin = dp(2f)
+                bottomMargin = dp(10f)
             }
         }
 
-        val appsBtn = Button(this).apply {
-            text = "Select apps to lock (PIN)"
-            setOnClickListener {
+        // 3. Pure crystal Liquid Glass status pill showing PIN-locked & Daily Limits counts
+        val statusCard = AeroGlassUi.createGlassCard(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                bottomMargin = dp(10f)
+            }
+        }
+
+        lockedCountView = TextView(this).apply {
+            textSize = 25f
+            typeface = AeroGlassUi.tallFont(weight = 700)
+            setTextColor(0xFF146DA8.toInt())
+            gravity = Gravity.CENTER
+        }
+        val lockedCol = buildStatColumn(lockedCountView, "PIN-Locked Apps")
+
+        val divider = View(this).apply {
+            setBackgroundColor(0x307C9FB5)
+            layoutParams = LinearLayout.LayoutParams(dp(1f), dp(36f)).apply {
+                marginStart = dp(8f)
+                marginEnd = dp(8f)
+            }
+        }
+
+        limitsCountView = TextView(this).apply {
+            textSize = 25f
+            typeface = AeroGlassUi.tallFont(weight = 700)
+            setTextColor(0xFF18824A.toInt())
+            gravity = Gravity.CENTER
+        }
+        val limitsCol = buildStatColumn(limitsCountView, "Usage Limits")
+
+        statusCard.addView(lockedCol)
+        statusCard.addView(divider)
+        statusCard.addView(limitsCol)
+
+        // 4. Optional frosted glass notices
+        accNoticeView = AeroGlassUi.createGlassNotice(
+            this,
+            getString(R.string.main_accessibility_off_note),
+            isWarning = true,
+        )
+        phoneNoticeView = AeroGlassUi.createGlassNotice(
+            this,
+            getString(R.string.main_phone_not_set_note),
+            isWarning = false,
+        )
+
+        // 5. Crystal-clear Liquid Glass menu buttons (clear in the middle, catching subtle green at bottom)
+        val buttonColumn = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(6f)
+            }
+        }
+
+        buttonColumn.addView(
+            AeroGlassUi.createGlassButton(
+                this,
+                "Select Apps to Lock (PIN)",
+                AeroGlassUi.GlassTone.LIQUID_CLEAR,
+            ) {
                 requirePinThen {
                     startActivity(Intent(this@MainActivity, AppSelectorActivity::class.java))
                 }
-            }
-        }
+            },
+        )
 
-        val limitsBtn = Button(this).apply {
-            text = "App Usage Limits"
-            setOnClickListener {
+        buttonColumn.addView(
+            AeroGlassUi.createGlassButton(
+                this,
+                "App Usage Limits",
+                AeroGlassUi.GlassTone.LIQUID_CLEAR,
+            ) {
                 requirePinThen {
                     startActivity(Intent(this@MainActivity, UsageLimitsActivity::class.java))
                 }
-            }
-        }
+            },
+        )
 
-        val spentBtn = Button(this).apply {
-            text = "Time Spent on Apps"
-            setOnClickListener {
+        buttonColumn.addView(
+            AeroGlassUi.createGlassButton(
+                this,
+                "Time Spent on Apps",
+                AeroGlassUi.GlassTone.LIQUID_CLEAR,
+            ) {
                 startActivity(Intent(this@MainActivity, TimeSpentActivity::class.java))
-            }
-        }
+            },
+        )
 
-        val smsAlertsBtn = Button(this).apply {
-            text = "Text Message Alerts"
-            setOnClickListener {
+        buttonColumn.addView(
+            AeroGlassUi.createGlassButton(
+                this,
+                "Text Message Alerts",
+                AeroGlassUi.GlassTone.LIQUID_CLEAR,
+            ) {
                 requirePinThen {
                     startActivity(Intent(this@MainActivity, SmsAlertsActivity::class.java))
                 }
-            }
-        }
+            },
+        )
 
-        val setupBtn = Button(this).apply {
-            text = getString(R.string.setup_title)
-            setOnClickListener {
+        buttonColumn.addView(
+            AeroGlassUi.createGlassButton(
+                this,
+                "Change PIN",
+                AeroGlassUi.GlassTone.LIQUID_FROST,
+            ) {
+                requirePinThen {
+                    startActivity(Intent(this@MainActivity, PinSetupActivity::class.java))
+                }
+            },
+        )
+
+        buttonColumn.addView(
+            AeroGlassUi.createGlassButton(
+                this,
+                getString(R.string.setup_title),
+                AeroGlassUi.GlassTone.LIQUID_FROST,
+            ) {
                 startActivity(Intent(this@MainActivity, PermissionsSetupActivity::class.java))
-            }
+            },
+        )
+
+        DebugMenu.addButton(this, buttonColumn, ::requirePinThen)
+
+        content.addView(title)
+        content.addView(windowGraphic)
+        content.addView(statusCard)
+        content.addView(accNoticeView)
+        content.addView(phoneNoticeView)
+        content.addView(buttonColumn)
+
+        val bottomSpacer = Space(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f,
+            )
         }
 
-        layout.addView(title)
-        layout.addView(status)
-        if (!accEnabled) {
-            val accNote = TextView(this).apply {
-                text = getString(R.string.main_accessibility_off_note)
-                textSize = 14f
-                gravity = Gravity.CENTER
-                setPadding(0, 0, 0, 12)
-            }
-            layout.addView(accNote)
+        // 6. Small tall modern version footer at the bottom
+        val versionFooter = TextView(this).apply {
+            text = getString(R.string.main_version_footer, appVersion())
+            textSize = 12.5f
+            typeface = AeroGlassUi.tallFont(weight = 400)
+            letterSpacing = 0.03f
+            setTextColor(0xFF5D786E.toInt())
+            gravity = Gravity.CENTER
+            setPadding(0, dp(20f), 0, dp(4f))
         }
-        if (!hasPhoneNumber) {
-            val phoneNote = TextView(this).apply {
-                text = getString(R.string.main_phone_not_set_note)
-                textSize = 14f
-                gravity = Gravity.CENTER
-                setPadding(0, 0, 0, 16)
-            }
-            layout.addView(phoneNote)
-        }
-        layout.addView(pinBtn)
-        layout.addView(appsBtn)
-        layout.addView(limitsBtn)
-        layout.addView(spentBtn)
-        layout.addView(smsAlertsBtn)
-        layout.addView(setupBtn)
-        DebugMenu.addButton(this, layout, ::requirePinThen)
+
+        outer.addView(content)
+        outer.addView(bottomSpacer)
+        outer.addView(versionFooter)
 
         val scroll = ScrollView(this).apply {
             isFillViewport = true
-            addView(layout)
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+            background = AeroGlassUi.MainMenuBackgroundDrawable()
+            addView(outer)
         }
+
+        val basePadH = dp(24f)
+        val basePadTop = dp(22f)
+        val basePadBot = dp(18f)
+        val maxContentWidth = dp(440f)
+        ViewCompat.setOnApplyWindowInsetsListener(scroll) { _, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val availableW = resources.displayMetrics.widthPixels - bars.left - bars.right
+            val extraSide = ((availableW - maxContentWidth) / 2).coerceAtLeast(0)
+            outer.setPadding(
+                basePadH + bars.left + extraSide,
+                basePadTop + bars.top,
+                basePadH + bars.right + extraSide,
+                basePadBot + bars.bottom,
+            )
+            insets
+        }
+
         setContentView(scroll)
+    }
+
+    private fun buildStatColumn(valueView: TextView, caption: String): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            addView(valueView)
+            addView(
+                TextView(this@MainActivity).apply {
+                    text = caption
+                    textSize = 13.5f
+                    typeface = AeroGlassUi.tallFont(weight = 500)
+                    letterSpacing = 0.015f
+                    setTextColor(0xFF45667B.toInt())
+                    gravity = Gravity.CENTER
+                },
+            )
+        }
+
+    private fun refreshMainUi() {
+        if (!uiBuilt) return
+        lockedCountView.text = Prefs.getLockedPackages(this).size.toString()
+        limitsCountView.text = Prefs.getAllLimits(this).size.toString()
+
+        val accEnabled = isAccessibilityEnabled(this)
+        val hasPhoneNumber = Prefs.isValidPhoneNumber(Prefs.getSmsPhoneNumber(this))
+        accNoticeView.visibility = if (accEnabled) View.GONE else View.VISIBLE
+        phoneNoticeView.visibility = if (hasPhoneNumber) View.GONE else View.VISIBLE
     }
 
     override fun onStop() {
@@ -198,8 +386,8 @@ class MainActivity : Activity() {
 
     private fun appVersion(): String = try {
         @Suppress("DEPRECATION")
-        packageManager.getPackageInfo(packageName, 0).versionName ?: "0.12.2"
+        packageManager.getPackageInfo(packageName, 0).versionName ?: "0.13.0"
     } catch (_: Exception) {
-        "0.12.2"
+        "0.13.0"
     }
 }
