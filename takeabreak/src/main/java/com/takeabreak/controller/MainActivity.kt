@@ -198,8 +198,8 @@ class MainActivity : Activity() {
 
     private fun appVersion(): String = try {
         @Suppress("DEPRECATION")
-        packageManager.getPackageInfo(packageName, 0).versionName ?: "0.12.1"
+        packageManager.getPackageInfo(packageName, 0).versionName ?: "0.12.2"
     } catch (_: Exception) {
-        "0.12.1"
+        "0.12.2"
     }
 }

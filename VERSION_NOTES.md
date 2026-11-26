@@ -2,6 +2,14 @@
 
 Newest first. Version 1.0 is reserved until the owner decides the apps are ready.
 
+## 0.12.2 (2026-11-26)
+
+- **Version 0.12.2** (versionCode 122) on both apps.
+- **Documentation rewrite:**
+  - Simplified `README.md` into a clear, approachable GitHub landing page covering intent, privacy posture, core features, and updated v0.12.x getting-started steps.
+  - Added `ARCHITECTURE.md` as a separate technical deep dive covering the two-app signature trust model, multi-window/split-screen blocking engine (`AppLockAccessibilityService`, `AccessPolicy`, `BlockOverlay`), PIN session locking (`PinLockedActivity`), guided setup wizards & Watcher handshake, `PeerLink` tamper detection, durable SMS outbox/retry queue, permissions, and debug/release build & signing workflows.
+- Files: README.md, ARCHITECTURE.md (new), VERSION_NOTES.md, takeabreak/build.gradle.kts, takeabreak-watcher/build.gradle.kts, MainActivity.kt (both apps).
+
 ## 0.12.1 (2026-11-25)
 
 - **Version 0.12.1** (versionCode 121) on both apps.
