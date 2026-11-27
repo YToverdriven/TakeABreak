@@ -4,12 +4,20 @@
 
 Take a Break is an offline Android accountability suite for people who want to spend less time on their phones.
 
-Instead of relying on willpower alone—or sending your usage data to a cloud account—Take a Break lets someone you trust set a PIN, lock distracting apps, enforce daily screen-time limits, and receive SMS alerts if limits are bypassed or the app is tampered with.
+Instead of relying on willpower alone or sending your usage data to a cloud account, Take a Break lets someone you trust set a PIN, lock distracting apps, enforce daily screen-time limits, and receive SMS alerts if limits are bypassed or the app is tampered with.
 
 - **100% offline & private:** No internet permission, no accounts, no analytics, no Google Play services, and no Firebase. Screen content is never read or stored.
 - **Built for GrapheneOS and stock Android:** Runs on Android 8.0 (API 26) and newer.
 - **Two-app design:** Paired with **Take a Break Watcher**, a lightweight companion app that sends an SMS alert if Take a Break is ever disabled, force-stopped, cleared, turned off, or uninstalled.
-- **Voluntary by design:** No Device Admin lockouts—if there is ever an emergency or critical issue, the app can still be removed (while notifying your accountability partner via SMS).
+- **Voluntary by design:** No Device Admin lockouts. If there is ever an emergency or critical issue, the app can still be removed (while notifying your accountability partner via SMS).
+
+---
+
+## Download
+
+Download the latest signed release APKs from the **[GitHub Releases page](https://github.com/YToverdriven/TakeABreak/releases/latest)**.
+
+Install **both** APKs (`Take a Break` and `Take a Break Watcher`) from the same release so they share the same signing certificate.
 
 ---
 
