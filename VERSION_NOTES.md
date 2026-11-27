@@ -1,6 +1,28 @@
 # Take a Break — Version Notes
 
-Newest first. Version 1.0 is reserved until the owner decides the apps are ready.
+Newest first.
+
+## 1.0 (2026-11-26)
+
+- **Version 1.0** (versionCode 1000) release for both Take a Break and Take a Break Watcher.
+- Finalized 1.0 Liquid Glass UI across all screens, pop-ups, overlays, and menus in both apps, updated documentation to 1.0.
+- Files: takeabreak/build.gradle.kts, takeabreak-watcher/build.gradle.kts, MainActivity.kt (both apps), README.md, ARCHITECTURE.md, VERSION_NOTES.md.
+
+## 0.14.0 (2026-11-26)
+
+- **Version 0.14.0** (versionCode 140) on both apps.
+- **Unified Liquid Glass × Vista Aero UI across every screen, pop-up, and menu in both apps:**
+  - Extended `AeroGlassUi` with shared Liquid Glass buttons (with disabled frosted state), compact pills, frosted inputs, dropdown spinners, checkboxes, cards, notices, glossy progress bars, keypad tiles, and custom responsive Liquid Glass dialogs and time pickers.
+  - Applied the full edge-to-edge NoActionBar white-sky-green Liquid Glass design to all Take a Break screens (`MainActivity`, `PinSetupActivity`, `AppSelectorActivity`, `UsageLimitsActivity`, `TimeSpentActivity`, `SmsAlertsActivity`, all 8 steps of `PermissionsSetupActivity`, `PinPrompt`, and debug `DebugActivity`) and all Take a Break Watcher screens (`MainActivity`, all 3 steps of `PermissionsSetupActivity`, and debug `DebugPanel`).
+- **Fixed blocking pop-up (`BlockOverlay`) screen scaling and gap issue:**
+  - Configured `layoutInDisplayCutoutMode` (`ALWAYS` / `SHORT_EDGES`) and `fitInsetsTypes = 0` so the overlay spans cleanly into display cutout/status bar regions without shifting or leaving a top gap.
+  - Replaced hardcoded bottom margin minimums with exact navigation-bar inset handling: covers the full display edge-to-edge on gesture navigation (when not screen-pinned), meets the exact 3-button navigation bar edge with zero gap, and preserves unpin gesture reachability when screen-pinned.
+  - Made the overlay layout and keypad adapt responsively across screen sizes and orientations.
+- **Animated open-window icon on blocking pop-ups & Watcher:**
+  - Added the same animated shimmering `TakeABreakWindowView` from the home screen to `BlockOverlay` (for both PIN-lock and daily time-limit pop-ups), first-time Welcome/Setup screens, and Take a Break Watcher, with static bitmap/mask caching for instant display.
+- **Home screen menu organization:**
+  - Grouped non-PIN pages at the top (`Set Focus Mode (Coming Soon)`, `Time Spent on Apps`, `White Noise (Coming Soon)`) with a thin divider above `App Usage Limits (PIN)`, `Select Apps to Lock (PIN)`, `Text Message Alerts (PIN)`, `Change PIN`, and `Setup & Permissions`.
+- Files: AeroGlassUi.kt, TakeABreakWindowView.kt, BlockOverlay.kt, PinPrompt.kt, MenuUi.kt, MainActivity.kt, PinSetupActivity.kt, AppSelectorActivity.kt, UsageLimitsActivity.kt, TimeSpentActivity.kt, SmsAlertsActivity.kt, PermissionsSetupActivity.kt, DebugActivity.kt, AndroidManifest.xml, build.gradle.kts. Watcher: AeroGlassUi.kt (new), TakeABreakWindowView.kt (new), ic_takeabreak_window.png (new), MainActivity.kt, PermissionsSetupActivity.kt, DebugPanel.kt, AndroidManifest.xml, strings.xml, build.gradle.kts. Docs: VERSION_NOTES.md.
 
 ## 0.12.2 (2026-11-26)
 

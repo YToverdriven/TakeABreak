@@ -6,10 +6,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
+import android.view.Gravity
 import android.view.View
-import android.widget.Button
 import android.widget.LinearLayout
-import android.widget.ScrollView
+import android.widget.Space
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 
@@ -42,43 +42,125 @@ class MainActivity : Activity() {
             }
         }
 
-        val root = LinearLayout(this).apply {
+        val dp = { value: Float -> AeroGlassUi.dp(this, value) }
+
+        val outer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(48, 48, 48, 48)
+            gravity = Gravity.CENTER_HORIZONTAL
         }
-        val status = TextView(this).apply {
-            text = getString(R.string.watcher_status_summary, versionName())
-            textSize = 16f
-            setPadding(0, 0, 0, 12)
+
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            )
         }
-        smsWarning = TextView(this).apply {
-            text = getString(R.string.watcher_sms_off_note)
-            textSize = 14f
-            setPadding(0, 0, 0, 8)
+
+        val title = TextView(this).apply {
+            text = getString(R.string.watcher_title)
+            textSize = 30f
+            typeface = AeroGlassUi.minimalistFont(light = true)
+            letterSpacing = 0.025f
+            setTextColor(AeroGlassUi.TEXT_BLACK)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(6f), 0, dp(4f))
         }
-        phoneWarning = TextView(this).apply {
-            text = getString(R.string.watcher_phone_not_set_note)
-            textSize = 14f
-            setPadding(0, 0, 0, 12)
-        }
-        val setupBtn = Button(this).apply {
-            text = getString(R.string.watcher_setup_title)
-            setOnClickListener {
-                startActivity(Intent(this@MainActivity, PermissionsSetupActivity::class.java))
+
+        val windowGraphic = TakeABreakWindowView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(244f), dp(188f)).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+                topMargin = dp(4f)
+                bottomMargin = dp(12f)
             }
         }
 
-        root.addView(status)
-        root.addView(smsWarning)
-        root.addView(phoneWarning)
-        root.addView(setupBtn)
-        debugPanel.attach(root)
-
-        val outerScroll = ScrollView(this).apply {
-            isFillViewport = true
-            addView(root)
+        val statusCard = AeroGlassUi.createGlassCard(this, cornerDp = 24f).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                bottomMargin = dp(10f)
+            }
+            addView(
+                AeroGlassUi.createBodyText(
+                    this@MainActivity,
+                    getString(R.string.watcher_monitoring_desc),
+                    centered = true,
+                ).apply {
+                    setPadding(0, dp(2f), 0, dp(2f))
+                },
+            )
         }
-        setContentView(outerScroll)
+
+        smsWarning = AeroGlassUi.createGlassNotice(
+            this,
+            getString(R.string.watcher_sms_off_note),
+            isWarning = true,
+        )
+        phoneWarning = AeroGlassUi.createGlassNotice(
+            this,
+            getString(R.string.watcher_phone_not_set_note),
+            isWarning = false,
+        )
+
+        val setupBtn = AeroGlassUi.createGlassButton(
+            this,
+            getString(R.string.watcher_setup_title),
+            AeroGlassUi.GlassTone.LIQUID_CLEAR,
+        ) {
+            startActivity(Intent(this@MainActivity, PermissionsSetupActivity::class.java))
+        }.apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(6f)
+                bottomMargin = dp(6f)
+            }
+        }
+
+        content.addView(title)
+        content.addView(windowGraphic)
+        content.addView(statusCard)
+        content.addView(smsWarning)
+        content.addView(phoneWarning)
+        content.addView(setupBtn)
+        debugPanel.attach(content)
+
+        val bottomSpacer = Space(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f,
+            )
+        }
+
+        val versionFooter = TextView(this).apply {
+            text = getString(R.string.watcher_version_footer, versionName())
+            textSize = 12f
+            typeface = AeroGlassUi.minimalistFont(light = true)
+            letterSpacing = 0.03f
+            setTextColor(AeroGlassUi.TEXT_BLACK)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(20f), 0, dp(4f))
+        }
+
+        outer.addView(content)
+        outer.addView(bottomSpacer)
+        outer.addView(versionFooter)
+
+        setContentView(
+            AeroGlassUi.wrapScrollableScreen(
+                activity = this,
+                content = outer,
+                padHDp = 24f,
+                padTopDp = 22f,
+                padBotDp = 18f,
+                maxContentWidthDp = 440f,
+            ),
+        )
     }
 
     override fun onStart() {
@@ -139,8 +221,8 @@ class MainActivity : Activity() {
 
     private fun versionName(): String = try {
         @Suppress("DEPRECATION")
-        packageManager.getPackageInfo(packageName, 0).versionName ?: "0.12.2"
+        packageManager.getPackageInfo(packageName, 0).versionName ?: "1.0"
     } catch (_: Exception) {
-        "0.12.2"
+        "1.0"
     }
 }

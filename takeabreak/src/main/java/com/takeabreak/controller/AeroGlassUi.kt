@@ -1,7 +1,10 @@
 package com.takeabreak.controller
 
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ColorFilter
@@ -14,22 +17,47 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.View
+import android.view.ViewGroup
+import android.view.WindowManager
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.CheckBox
+import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.Spinner
 import android.widget.TextView
+import android.widget.TimePicker
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import kotlin.math.min
 
 /**
  * Shared visual primitives for Take a Break's Liquid Glass × Windows Vista Aero aesthetic:
  * - Pure white middle canvas with minimal sky-blue hue at the very top and minimal green hue at the very bottom.
- * - Crystal-clear refractive Liquid Glass pills with curved specular highlights, optical lens edges,
- *   luminous bottom caustic bounce, and translucent glass typography.
+ * - Crystal-clear refractive Liquid Glass pills, cards, inputs, dialogs, and keypads with curved
+ *   specular highlights, optical lens edges, luminous bottom caustic bounce, and clean modern
+ *   minimalist non-bold black typography.
  */
 object AeroGlassUi {
+
+    const val TEXT_BLACK = 0xFF000000.toInt()
+    const val TEXT_SECONDARY = 0xFF475866.toInt()
+    const val TEXT_MUTED = 0xFF6B7D8C.toInt()
+    const val TEXT_HINT = 0xFF7B8E9C.toInt()
+    const val ACCENT_SKY = 0xFF3E8EBA.toInt()
+    const val DIVIDER_GLASS = 0x2E7C9FB5
 
     enum class GlassTone(
         val bodyTop: Int,
@@ -39,8 +67,6 @@ object AeroGlassUi {
         val outerContourBottom: Int,
         val ambientShadow: Int,
         val contactShadow: Int,
-        val textTopColor: Int,
-        val textBottomColor: Int,
         val glossAlpha: Int,
     ) {
         /**
@@ -55,8 +81,6 @@ object AeroGlassUi {
             outerContourBottom = 0x5C6F93AA,
             ambientShadow = 0x1D113148,
             contactShadow = 0x14113148,
-            textTopColor = 0xFF0E4563.toInt(),
-            textBottomColor = 0xFF1A6078.toInt(),
             glossAlpha = 235,
         ),
 
@@ -72,9 +96,21 @@ object AeroGlassUi {
             outerContourBottom = 0x546E9B8C,
             ambientShadow = 0x19123344,
             contactShadow = 0x12123344,
-            textTopColor = 0xFF1A4B61.toInt(),
-            textBottomColor = 0xFF216255.toInt(),
             glossAlpha = 230,
+        ),
+
+        /**
+         * Subtle sunlit sky-tinted crystal glass for primary confirm/OK/Save actions.
+         */
+        LIQUID_SKY(
+            bodyTop = 0xDCEFF8FF.toInt(),
+            bodyMid = 0xCCE1F3FF.toInt(),
+            bodyBottom = 0xD8D4ECFC.toInt(),
+            outerContourTop = 0x665D9BC2,
+            outerContourBottom = 0x7A4785AD,
+            ambientShadow = 0x1F123A54,
+            contactShadow = 0x16123A54,
+            glossAlpha = 240,
         ),
     }
 
@@ -93,52 +129,221 @@ object AeroGlassUi {
         )
 
     /**
-     * Tall, sleek modern condensed font using Android's system condensed grotesque family.
+     * Clean, modern, minimalist sans-serif typeface (never bold).
+     * Uses light weight (300) for display titles/figures and regular weight (400) for body/controls.
      */
-    fun tallFont(weight: Int = 500): Typeface {
-        val base = Typeface.create("sans-serif-condensed", Typeface.NORMAL)
+    fun minimalistFont(light: Boolean = false): Typeface {
+        val weight = if (light) 300 else 400
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            Typeface.create(base, weight, false)
+            Typeface.create(Typeface.SANS_SERIF, weight, false)
         } else {
             Typeface.create(
-                "sans-serif-condensed",
-                if (weight >= 600) Typeface.BOLD else Typeface.NORMAL,
+                if (light) "sans-serif-light" else "sans-serif",
+                Typeface.NORMAL,
             )
         }
     }
 
+    /** Configures edge-to-edge transparent status & navigation bars with crisp dark icons. */
+    fun configureSystemBars(activity: Activity) {
+        WindowCompat.setDecorFitsSystemWindows(activity.window, false)
+        @Suppress("DEPRECATION")
+        activity.window.statusBarColor = Color.TRANSPARENT
+        @Suppress("DEPRECATION")
+        activity.window.navigationBarColor = Color.TRANSPARENT
+        WindowInsetsControllerCompat(activity.window, activity.window.decorView).apply {
+            isAppearanceLightStatusBars = true
+            isAppearanceLightNavigationBars = true
+        }
+    }
+
     /**
-     * Applies a subtle Liquid Glass vertical sheen shader to a [TextView] (used on the prominent
-     * heading and clear glass button labels so text itself looks sculpted in glass).
+     * Wraps a vertical [content] view inside a full-screen edge-to-edge [ScrollView] with the
+     * signature white/sky/green Liquid Glass canvas and responsive horizontal centering.
      */
-    fun applyGlassTextGradient(
-        textView: TextView,
-        topColor: Int,
-        midColor: Int,
-        bottomColor: Int,
-    ) {
-        textView.setTextColor(topColor)
-        textView.addOnLayoutChangeListener { view, _, top, _, bottom, _, oldTop, _, oldBottom ->
-            val h = (bottom - top).toFloat()
-            val oldH = (oldBottom - oldTop).toFloat()
-            if ((h > 0f) && ((h != oldH) || (textView.paint.shader == null))) {
-                textView.paint.shader = LinearGradient(
-                    0f,
-                    0f,
-                    0f,
-                    h,
-                    intArrayOf(topColor, midColor, bottomColor),
-                    floatArrayOf(0f, 0.48f, 1f),
-                    Shader.TileMode.CLAMP,
-                )
-                view.invalidate()
-            }
+    fun wrapScrollableScreen(
+        activity: Activity,
+        content: View,
+        padHDp: Float = 24f,
+        padTopDp: Float = 18f,
+        padBotDp: Float = 24f,
+        maxContentWidthDp: Float = 480f,
+    ): ScrollView {
+        configureSystemBars(activity)
+        val basePadH = dp(activity, padHDp)
+        val basePadTop = dp(activity, padTopDp)
+        val basePadBot = dp(activity, padBotDp)
+        val maxContentW = dp(activity, maxContentWidthDp)
+
+        content.setPadding(basePadH, basePadTop, basePadH, basePadBot)
+
+        val scroll = ScrollView(activity).apply {
+            isFillViewport = true
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+            background = MainMenuBackgroundDrawable()
+            addView(
+                content,
+                ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(scroll) { _, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime(),
+            )
+            val availableW = activity.resources.displayMetrics.widthPixels - bars.left - bars.right
+            val extraSide = ((availableW - maxContentW) / 2).coerceAtLeast(0)
+            content.setPadding(
+                basePadH + bars.left + extraSide,
+                basePadTop + bars.top,
+                basePadH + bars.right + extraSide,
+                basePadBot + bars.bottom,
+            )
+            insets
+        }
+        ViewCompat.requestApplyInsets(scroll)
+        return scroll
+    }
+
+    /**
+     * Applies the signature edge-to-edge Liquid Glass background and responsive insets to a
+     * fixed-layout screen root (for example, screens with a fixed header, scrollable list, and
+     * fixed bottom action button).
+     */
+    fun wrapFixedScreen(
+        activity: Activity,
+        root: ViewGroup,
+        padHDp: Float = 22f,
+        padTopDp: Float = 16f,
+        padBotDp: Float = 18f,
+        maxContentWidthDp: Float = 520f,
+    ): ViewGroup {
+        configureSystemBars(activity)
+        val basePadH = dp(activity, padHDp)
+        val basePadTop = dp(activity, padTopDp)
+        val basePadBot = dp(activity, padBotDp)
+        val maxContentW = dp(activity, maxContentWidthDp)
+
+        root.background = MainMenuBackgroundDrawable()
+        root.setPadding(basePadH, basePadTop, basePadH, basePadBot)
+
+        ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime(),
+            )
+            val availableW = activity.resources.displayMetrics.widthPixels - bars.left - bars.right
+            val extraSide = ((availableW - maxContentW) / 2).coerceAtLeast(0)
+            root.setPadding(
+                basePadH + bars.left + extraSide,
+                basePadTop + bars.top,
+                basePadH + bars.right + extraSide,
+                basePadBot + bars.bottom,
+            )
+            insets
+        }
+        ViewCompat.requestApplyInsets(root)
+        return root
+    }
+
+    private fun buttonTextColors(): ColorStateList = ColorStateList(
+        arrayOf(
+            intArrayOf(-android.R.attr.state_enabled),
+            intArrayOf(),
+        ),
+        intArrayOf(
+            0x7A243642,
+            TEXT_BLACK,
+        ),
+    )
+
+    private fun checkboxTintList(): ColorStateList = ColorStateList(
+        arrayOf(
+            intArrayOf(android.R.attr.state_checked),
+            intArrayOf(),
+        ),
+        intArrayOf(
+            ACCENT_SKY,
+            0xFF7B99AD.toInt(),
+        ),
+    )
+
+    /** Modern minimalist display title (non-bold light weight). */
+    fun createTitle(
+        context: Context,
+        text: String,
+        sizeSp: Float = 28f,
+        centered: Boolean = false,
+    ): TextView = TextView(context).apply {
+        this.text = text
+        textSize = sizeSp
+        typeface = minimalistFont(light = true)
+        letterSpacing = 0.02f
+        setTextColor(TEXT_BLACK)
+        gravity = if (centered) Gravity.CENTER else Gravity.START
+        setPadding(0, dp(context, 6f), 0, dp(context, 8f))
+    }
+
+    /** Section heading inside screens and glass cards. */
+    fun createSectionTitle(context: Context, text: String): TextView = TextView(context).apply {
+        this.text = text
+        textSize = 16.5f
+        typeface = minimalistFont(light = false)
+        letterSpacing = 0.015f
+        setTextColor(TEXT_BLACK)
+        setPadding(0, dp(context, 4f), 0, dp(context, 6f))
+    }
+
+    /** Clean minimalist body copy. */
+    fun createBodyText(
+        context: Context,
+        text: String,
+        centered: Boolean = false,
+        secondary: Boolean = false,
+    ): TextView = TextView(context).apply {
+        this.text = text
+        textSize = 14.5f
+        typeface = minimalistFont(light = false)
+        letterSpacing = 0.01f
+        setLineSpacing(dpF(context, 2.5f), 1f)
+        setTextColor(if (secondary) TEXT_SECONDARY else TEXT_BLACK)
+        gravity = if (centered) Gravity.CENTER else Gravity.START
+        setPadding(0, 0, 0, dp(context, 10f))
+    }
+
+    /** Subtle smaller minimalist caption/helper text. */
+    fun createCaptionText(
+        context: Context,
+        text: String,
+        centered: Boolean = false,
+    ): TextView = TextView(context).apply {
+        this.text = text
+        textSize = 13f
+        typeface = minimalistFont(light = false)
+        letterSpacing = 0.01f
+        setLineSpacing(dpF(context, 2f), 1f)
+        setTextColor(TEXT_SECONDARY)
+        gravity = if (centered) Gravity.CENTER else Gravity.START
+    }
+
+    /** Delicate translucent hairline divider inside glass cards. */
+    fun createDivider(context: Context, verticalMarginDp: Float = 6f): View = View(context).apply {
+        setBackgroundColor(DIVIDER_GLASS)
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(context, 1f).coerceAtLeast(1),
+        ).apply {
+            topMargin = dp(context, verticalMarginDp)
+            bottomMargin = dp(context, verticalMarginDp)
         }
     }
 
     /**
      * Creates a clear Liquid Glass × Vista Aero pill button with high optical clarity,
-     * specular refractive rim, subtle glass-gradient typography, and spring-like press feedback.
+     * specular refractive rim, modern minimalist black typography, disabled frost state,
+     * and spring-like press feedback.
      */
     @SuppressLint("ClickableViewAccessibility")
     fun createGlassButton(
@@ -149,23 +354,17 @@ object AeroGlassUi {
     ): Button = Button(context).apply {
         text = label
         isAllCaps = false
-        textSize = 18f
-        typeface = tallFont(weight = 600)
-        letterSpacing = 0.02f
-        setShadowLayer(2f, 0f, 1.2f, 0xE0FFFFFF.toInt())
-        applyGlassTextGradient(
-            this,
-            topColor = tone.textTopColor,
-            midColor = blend(tone.textTopColor, tone.textBottomColor, 0.35f),
-            bottomColor = tone.textBottomColor,
-        )
+        textSize = 16.5f
+        typeface = minimalistFont(light = false)
+        letterSpacing = 0.015f
+        setTextColor(buttonTextColors())
         gravity = Gravity.CENTER
         stateListAnimator = null
         elevation = 0f
         background = LiquidGlassPillDrawable(context, tone)
         minHeight = dp(context, 56f)
         minimumHeight = dp(context, 56f)
-        setPadding(dp(context, 24f), dp(12f, context), dp(context, 24f), dp(14f, context))
+        setPadding(dp(context, 24f), dp(context, 12f), dp(context, 24f), dp(context, 14f))
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -173,24 +372,115 @@ object AeroGlassUi {
             topMargin = dp(context, 5f)
             bottomMargin = dp(context, 5f)
         }
-        setOnTouchListener { view, event ->
+        attachPressFeedback(this)
+        setOnClickListener { onClick() }
+    }
+
+    /** Compact Liquid Glass pill button for navigation headers, inline actions, and dialog bars. */
+    @SuppressLint("ClickableViewAccessibility")
+    fun createCompactGlassButton(
+        context: Context,
+        label: String,
+        tone: GlassTone = GlassTone.LIQUID_FROST,
+        onClick: () -> Unit,
+    ): Button = Button(context).apply {
+        text = label
+        isAllCaps = false
+        textSize = 14.5f
+        typeface = minimalistFont(light = false)
+        letterSpacing = 0.015f
+        setTextColor(buttonTextColors())
+        gravity = Gravity.CENTER
+        stateListAnimator = null
+        elevation = 0f
+        background = LiquidGlassPillDrawable(context, tone, cornerDp = 21f)
+        minHeight = dp(context, 44f)
+        minimumHeight = dp(context, 44f)
+        minWidth = dp(context, 72f)
+        minimumWidth = dp(context, 72f)
+        setPadding(dp(context, 18f), dp(context, 8f), dp(context, 18f), dp(context, 10f))
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        )
+        attachPressFeedback(this)
+        setOnClickListener { onClick() }
+    }
+
+    /** Tactile Liquid Glass keypad key for PIN pads (PinPrompt & BlockOverlay). */
+    @SuppressLint("ClickableViewAccessibility")
+    fun createKeypadButton(
+        context: Context,
+        caption: String,
+        tone: GlassTone = GlassTone.LIQUID_CLEAR,
+        keyHeightDp: Float = 54f,
+        textSizeSp: Float = 19f,
+        onClick: () -> Unit,
+    ): Button = Button(context).apply {
+        text = caption
+        isAllCaps = false
+        textSize = textSizeSp
+        typeface = minimalistFont(light = caption.length == 1 && caption[0].isDigit())
+        letterSpacing = 0.015f
+        setTextColor(buttonTextColors())
+        gravity = Gravity.CENTER
+        stateListAnimator = null
+        elevation = 0f
+        background = LiquidGlassPillDrawable(context, tone, cornerDp = 20f)
+        val h = dp(context, keyHeightDp)
+        minHeight = h
+        minimumHeight = h
+        setPadding(dp(context, 8f), dp(context, 4f), dp(context, 8f), dp(context, 6f))
+        val gap = dp(context, 4f)
+        layoutParams = LinearLayout.LayoutParams(0, h, 1f).apply {
+            setMargins(gap, gap, gap, gap)
+        }
+        attachPressFeedback(this)
+        setOnClickListener { onClick() }
+    }
+
+    /** Top-left compact back/save pill button row. */
+    fun createTopBarBackButton(
+        context: Context,
+        label: String = "Back",
+        onClick: () -> Unit,
+    ): Button = createCompactGlassButton(
+        context = context,
+        label = if (label == "Back") "\u2190  Back" else label,
+        tone = GlassTone.LIQUID_FROST,
+        onClick = onClick,
+    ).apply {
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).apply {
+            gravity = Gravity.START
+            bottomMargin = dp(context, 8f)
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun attachPressFeedback(view: View) {
+        view.setOnTouchListener { v, event ->
+            if (!v.isEnabled) return@setOnTouchListener false
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    view.animate().scaleX(0.98f).scaleY(0.98f).setDuration(85).start()
+                    v.animate().scaleX(0.98f).scaleY(0.98f).setDuration(85).start()
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    view.animate().scaleX(1f).scaleY(1f).setDuration(140).start()
+                    v.animate().scaleX(1f).scaleY(1f).setDuration(140).start()
                 }
             }
             false
         }
-        setOnClickListener { onClick() }
     }
 
-    private fun dp(value: Float, context: Context): Int = dp(context, value)
-
-    /** Creates a pure crystal-clear Liquid Glass status card (no heavy hues in the middle). */
-    fun createGlassCard(context: Context): LinearLayout = LinearLayout(context).apply {
+    /** Creates a pure crystal-clear Liquid Glass card (no heavy hues in the middle). */
+    fun createGlassCard(
+        context: Context,
+        cornerDp: Float = 24f,
+    ): LinearLayout = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
         background = AeroGlassCardDrawable(
             context = context,
             tintTop = 0xE6FFFFFF.toInt(),
@@ -199,23 +489,24 @@ object AeroGlassUi {
             rimColor = 0xFFFFFFFF.toInt(),
             strokeTint = 0x527EA0B5,
             shadowColor = 0x1A123247,
+            cornerDp = cornerDp,
         )
         setPadding(dp(context, 18f), dp(context, 14f), dp(context, 18f), dp(context, 16f))
     }
 
-    /** Creates a compact clear frosted glass notice banner. */
+    /** Creates a compact clear frosted glass notice banner with minimalist black text. */
     fun createGlassNotice(
         context: Context,
         message: String,
         isWarning: Boolean,
     ): TextView = TextView(context).apply {
         text = message
-        textSize = 14f
-        typeface = tallFont(weight = 400)
+        textSize = 13.5f
+        typeface = minimalistFont(light = false)
         letterSpacing = 0.01f
         gravity = Gravity.CENTER
         setLineSpacing(dpF(context, 2f), 1f)
-        setTextColor(if (isWarning) 0xFF7A4400.toInt() else 0xFF1F4C63.toInt())
+        setTextColor(TEXT_BLACK)
         background = if (isWarning) {
             AeroGlassCardDrawable(
                 context = context,
@@ -249,13 +540,331 @@ object AeroGlassUi {
         }
     }
 
-    private fun blend(c1: Int, c2: Int, t: Float): Int {
-        val inv = 1f - t
-        return Color.argb(
-            ((Color.alpha(c1) * inv) + (Color.alpha(c2) * t)).toInt().coerceIn(0, 255),
-            ((Color.red(c1) * inv) + (Color.red(c2) * t)).toInt().coerceIn(0, 255),
-            ((Color.green(c1) * inv) + (Color.green(c2) * t)).toInt().coerceIn(0, 255),
-            ((Color.blue(c1) * inv) + (Color.blue(c2) * t)).toInt().coerceIn(0, 255),
+    /** Creates a crystal Liquid Glass rounded text input field. */
+    fun createGlassInput(
+        context: Context,
+        hintText: String,
+        inputTypeFlags: Int,
+    ): EditText = EditText(context).apply {
+        hint = hintText
+        inputType = inputTypeFlags
+        textSize = 15.5f
+        typeface = minimalistFont(light = false)
+        letterSpacing = 0.01f
+        setTextColor(TEXT_BLACK)
+        setHintTextColor(TEXT_HINT)
+        background = LiquidGlassInputDrawable(context)
+        minHeight = dp(context, 50f)
+        minimumHeight = dp(context, 50f)
+        setPadding(dp(context, 16f), dp(context, 12f), dp(context, 16f), dp(context, 12f))
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).apply {
+            topMargin = dp(context, 4f)
+            bottomMargin = dp(context, 8f)
+        }
+    }
+
+    /** Creates a clean minimalist CheckBox styled to harmonize with Liquid Glass cards. */
+    fun createGlassCheckBox(
+        context: Context,
+        label: String,
+        checked: Boolean,
+        onCheckedChange: (Boolean) -> Unit,
+    ): CheckBox = CheckBox(context).apply {
+        text = label
+        isChecked = checked
+        textSize = 14.5f
+        typeface = minimalistFont(light = false)
+        letterSpacing = 0.01f
+        setLineSpacing(dpF(context, 2f), 1f)
+        setTextColor(TEXT_BLACK)
+        buttonTintList = checkboxTintList()
+        setPadding(dp(context, 8f), dp(context, 8f), dp(context, 4f), dp(context, 8f))
+        setOnCheckedChangeListener { _, isCheckedNow -> onCheckedChange(isCheckedNow) }
+    }
+
+    /** Creates a standalone checkbox box (for app selector rows where label sits beside it). */
+    fun createBareGlassCheckBox(
+        context: Context,
+        checked: Boolean,
+        onCheckedChange: (Boolean) -> Unit,
+    ): CheckBox = CheckBox(context).apply {
+        isChecked = checked
+        buttonTintList = checkboxTintList()
+        setOnCheckedChangeListener { _, isCheckedNow -> onCheckedChange(isCheckedNow) }
+    }
+
+    /** Creates a frosted Liquid Glass dropdown spinner with minimalist typography. */
+    fun createGlassSpinner(
+        context: Context,
+        items: List<String>,
+        selectedIndex: Int,
+        onSelected: (Int) -> Unit,
+    ): Spinner = Spinner(context).apply {
+        val adapter = object : ArrayAdapter<String>(
+            context,
+            android.R.layout.simple_spinner_item,
+            items,
+        ) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val tv = (super.getView(position, convertView, parent) as TextView)
+                tv.typeface = minimalistFont(light = false)
+                tv.textSize = 14.5f
+                tv.setTextColor(TEXT_BLACK)
+                tv.setPadding(dp(context, 4f), 0, dp(context, 4f), 0)
+                return tv
+            }
+
+            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val tv = (super.getDropDownView(position, convertView, parent) as TextView)
+                tv.typeface = minimalistFont(light = false)
+                tv.textSize = 15f
+                tv.setTextColor(TEXT_BLACK)
+                tv.setBackgroundColor(0xFFF8FCFF.toInt())
+                tv.setPadding(dp(context, 16f), dp(context, 12f), dp(context, 16f), dp(context, 12f))
+                return tv
+            }
+        }
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        this.adapter = adapter
+        setSelection(selectedIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0)))
+        background = LiquidGlassInputDrawable(context)
+        minimumHeight = dp(context, 50f)
+        setPadding(dp(context, 10f), dp(context, 8f), dp(context, 12f), dp(context, 8f))
+        onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: AdapterView<*>?,
+                view: View?,
+                position: Int,
+                id: Long,
+            ) {
+                onSelected(position)
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+    }
+
+    /** Creates a glossy rounded progress track drawable for Time Spent bars. */
+    fun createGlassBarTrackDrawable(context: Context): Drawable = AeroGlassCardDrawable(
+        context = context,
+        tintTop = 0xCCEBF3F8.toInt(),
+        tintMid = 0xC2F3F8FB.toInt(),
+        tintBottom = 0xCCF7FBFD.toInt(),
+        rimColor = 0xD8FFFFFF.toInt(),
+        strokeTint = 0x3A7E9FB4,
+        shadowColor = 0x00000000,
+        cornerDp = 12f,
+    )
+
+    /** Creates a glossy rounded fill bar drawable with subtle Vista Aero upper shine. */
+    fun createGlassBarFillDrawable(context: Context, baseColor: Int): Drawable =
+        GlossyBarDrawable(context, baseColor)
+
+    /**
+     * Builds a crystal-clear Liquid Glass [AlertDialog] that scales responsively to the screen
+     * width with zero stock-dialog frame gaps, soft dim backdrop, and Liquid Glass buttons.
+     */
+    fun createGlassDialog(
+        context: Context,
+        title: String? = null,
+        message: String? = null,
+        customView: View? = null,
+        positiveText: String? = null,
+        onPositive: ((AlertDialog) -> Unit)? = null,
+        negativeText: String? = null,
+        onNegative: ((AlertDialog) -> Unit)? = null,
+        neutralText: String? = null,
+        onNeutral: ((AlertDialog) -> Unit)? = null,
+        cancelable: Boolean = true,
+        maxWidthDp: Float = 400f,
+    ): AlertDialog {
+        lateinit var dialog: AlertDialog
+
+        val card = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            background = AeroGlassCardDrawable(
+                context = context,
+                tintTop = 0xF7FFFFFF.toInt(),
+                tintMid = 0xF4F9FCFE.toInt(),
+                tintBottom = 0xF5EFF7FB.toInt(),
+                rimColor = 0xFFFFFFFF.toInt(),
+                strokeTint = 0x627BA0B8,
+                shadowColor = 0x26102F45,
+                cornerDp = 28f,
+            )
+            setPadding(dp(context, 22f), dp(context, 20f), dp(context, 22f), dp(context, 20f))
+        }
+
+        if (!title.isNullOrBlank()) {
+            card.addView(
+                TextView(context).apply {
+                    text = title
+                    textSize = 21f
+                    typeface = minimalistFont(light = true)
+                    letterSpacing = 0.02f
+                    setTextColor(TEXT_BLACK)
+                    gravity = Gravity.CENTER
+                    setPadding(0, dp(context, 2f), 0, dp(context, 10f))
+                },
+            )
+        }
+
+        val bodyColumn = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+
+        if (!message.isNullOrBlank()) {
+            bodyColumn.addView(
+                TextView(context).apply {
+                    text = message
+                    textSize = 14.5f
+                    typeface = minimalistFont(light = false)
+                    letterSpacing = 0.01f
+                    setLineSpacing(dpF(context, 2.5f), 1f)
+                    setTextColor(TEXT_BLACK)
+                    gravity = Gravity.START
+                    setPadding(dp(context, 2f), 0, dp(context, 2f), dp(context, 12f))
+                },
+            )
+        }
+
+        if (customView != null) {
+            bodyColumn.addView(customView)
+        }
+
+        val maxBodyH = (context.resources.displayMetrics.heightPixels * 0.62f).toInt()
+            .coerceAtLeast(dp(context, 180f))
+        val bodyScroll = MaxHeightScrollView(context, maxBodyH).apply {
+            isFillViewport = false
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+            addView(
+                bodyColumn,
+                ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            )
+        }
+        card.addView(bodyScroll)
+
+        val hasAnyButton = (positiveText != null) || (negativeText != null) || (neutralText != null)
+        if (hasAnyButton) {
+            val buttonRow = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply {
+                    topMargin = dp(context, 10f)
+                }
+            }
+
+            fun addActionBtn(label: String, tone: GlassTone, action: (() -> Unit)) {
+                val btn = createCompactGlassButton(context, label, tone, action).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        0,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        1f,
+                    ).apply {
+                        val gap = dp(context, 4f)
+                        setMargins(gap, 0, gap, 0)
+                    }
+                    setPadding(dp(context, 10f), dp(context, 9f), dp(context, 10f), dp(context, 11f))
+                }
+                buttonRow.addView(btn)
+            }
+
+            if (neutralText != null) {
+                addActionBtn(neutralText, GlassTone.LIQUID_FROST) {
+                    if (onNeutral != null) onNeutral(dialog) else dialog.dismiss()
+                }
+            }
+            if (negativeText != null) {
+                addActionBtn(negativeText, GlassTone.LIQUID_FROST) {
+                    if (onNegative != null) onNegative(dialog) else dialog.dismiss()
+                }
+            }
+            if (positiveText != null) {
+                addActionBtn(positiveText, GlassTone.LIQUID_SKY) {
+                    if (onPositive != null) onPositive(dialog) else dialog.dismiss()
+                }
+            }
+
+            card.addView(buttonRow)
+        }
+
+        val wrapper = FrameLayout(context).apply {
+            setPadding(dp(context, 6f), dp(context, 6f), dp(context, 6f), dp(context, 6f))
+            addView(
+                card,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+        }
+
+        dialog = AlertDialog.Builder(context)
+            .setView(wrapper)
+            .setCancelable(cancelable)
+            .create()
+        dialog.setCanceledOnTouchOutside(cancelable)
+        dialog.setOnShowListener {
+            dialog.window?.let { win ->
+                win.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+                win.decorView.setPadding(0, 0, 0, 0)
+                win.setDimAmount(0.30f)
+                val dm = context.resources.displayMetrics
+                val maxW = dp(context, maxWidthDp)
+                val margin = dp(context, 28f)
+                val targetW = min(dm.widthPixels - margin, maxW).coerceAtLeast(dp(context, 260f))
+                win.setLayout(targetW, WindowManager.LayoutParams.WRAP_CONTENT)
+            }
+        }
+        return dialog
+    }
+
+    /** Builds a Liquid Glass time-picker dialog wrapping the native Android [TimePicker]. */
+    fun createGlassTimePickerDialog(
+        context: Context,
+        title: String,
+        initialHour: Int,
+        initialMinute: Int,
+        is24Hour: Boolean,
+        onTimeSet: (Int, Int) -> Unit,
+    ): AlertDialog {
+        val picker = TimePicker(context).apply {
+            setIs24HourView(is24Hour)
+            hour = initialHour
+            minute = initialMinute
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+            }
+        }
+        return createGlassDialog(
+            context = context,
+            title = title,
+            customView = picker,
+            positiveText = "Set",
+            onPositive = { dlg ->
+                onTimeSet(picker.hour, picker.minute)
+                dlg.dismiss()
+            },
+            negativeText = "Cancel",
+            onNegative = { dlg -> dlg.dismiss() },
+            maxWidthDp = 380f,
         )
     }
 
@@ -312,8 +921,9 @@ object AeroGlassUi {
     private class LiquidGlassPillDrawable(
         context: Context,
         private val tone: GlassTone,
+        cornerDp: Float = 26f,
     ) : Drawable() {
-        private val radius = dpF(context, 26f)
+        private val radius = dpF(context, cornerDp)
         private val insetX = dpF(context, 3.5f)
         private val insetTop = dpF(context, 2f)
         private val insetBottom = dpF(context, 6f)
@@ -336,13 +946,16 @@ object AeroGlassUi {
         private val glossPath = Path()
 
         private var pressed = false
+        private var enabled = true
 
         override fun isStateful(): Boolean = true
 
         override fun onStateChange(state: IntArray): Boolean {
             val nowPressed = state.contains(android.R.attr.state_pressed)
-            if (nowPressed != pressed) {
+            val nowEnabled = state.contains(android.R.attr.state_enabled)
+            if ((nowPressed != pressed) || (nowEnabled != enabled)) {
                 pressed = nowPressed
+                enabled = nowEnabled
                 invalidateSelf()
                 return true
             }
@@ -353,7 +966,8 @@ object AeroGlassUi {
             val b: Rect = bounds
             if ((b.width() <= 0) || (b.height() <= 0)) return
 
-            val pressOffset = if (pressed) insetTop * 0.7f else 0f
+            val effPressed = pressed && enabled
+            val pressOffset = if (effPressed) insetTop * 0.7f else 0f
             bodyRect.set(
                 b.left + insetX,
                 b.top + insetTop + pressOffset,
@@ -362,31 +976,46 @@ object AeroGlassUi {
             )
             if ((bodyRect.width() <= 0f) || (bodyRect.height() <= 0f)) return
 
-            // 1. Two-stage Liquid Glass elevation shadow (broad airy ambient + tight crisp contact)
-            val ambDrop = if (pressed) insetBottom * 0.30f else insetBottom * 0.78f
+            val r = min(radius, bodyRect.height() * 0.5f)
+
+            // 1. Two-stage Liquid Glass elevation shadow (reduced when disabled)
+            val shadowScale = if (enabled) 1f else 0.40f
+            val ambDrop = if (effPressed) insetBottom * 0.30f else insetBottom * 0.78f
             shadowRect.set(
                 bodyRect.left + (insetX * 0.6f),
                 bodyRect.top + ambDrop,
                 bodyRect.right - (insetX * 0.6f),
                 bodyRect.bottom + ambDrop,
             )
-            ambientShadowPaint.color = tone.ambientShadow
-            canvas.drawRoundRect(shadowRect, radius, radius, ambientShadowPaint)
+            ambientShadowPaint.color = scaleAlpha(tone.ambientShadow, shadowScale)
+            canvas.drawRoundRect(shadowRect, r, r, ambientShadowPaint)
 
-            val contactDrop = if (pressed) insetBottom * 0.14f else insetBottom * 0.34f
+            val contactDrop = if (effPressed) insetBottom * 0.14f else insetBottom * 0.34f
             shadowRect.set(
                 bodyRect.left + (insetX * 0.25f),
                 bodyRect.top + contactDrop,
                 bodyRect.right - (insetX * 0.25f),
                 bodyRect.bottom + contactDrop,
             )
-            contactShadowPaint.color = tone.contactShadow
-            canvas.drawRoundRect(shadowRect, radius, radius, contactShadowPaint)
+            contactShadowPaint.color = scaleAlpha(tone.contactShadow, shadowScale)
+            canvas.drawRoundRect(shadowRect, r, r, contactShadowPaint)
 
             // 2. Crystal-clear translucent Liquid Glass fill
-            val topC = if (pressed) tintDown(tone.bodyTop, 0.95f) else tone.bodyTop
-            val midC = if (pressed) tintDown(tone.bodyMid, 0.94f) else tone.bodyMid
-            val botC = if (pressed) tintDown(tone.bodyBottom, 0.94f) else tone.bodyBottom
+            val topC = when {
+                !enabled -> 0xA8F5F8FA.toInt()
+                effPressed -> tintDown(tone.bodyTop, 0.95f)
+                else -> tone.bodyTop
+            }
+            val midC = when {
+                !enabled -> 0x9AF1F5F8.toInt()
+                effPressed -> tintDown(tone.bodyMid, 0.94f)
+                else -> tone.bodyMid
+            }
+            val botC = when {
+                !enabled -> 0xA4EBF1F5.toInt()
+                effPressed -> tintDown(tone.bodyBottom, 0.94f)
+                else -> tone.bodyBottom
+            }
             bodyPaint.shader = LinearGradient(
                 0f,
                 bodyRect.top,
@@ -397,23 +1026,25 @@ object AeroGlassUi {
                 Shader.TileMode.CLAMP,
             )
             bodyPath.reset()
-            bodyPath.addRoundRect(bodyRect, radius, radius, Path.Direction.CW)
+            bodyPath.addRoundRect(bodyRect, r, r, Path.Direction.CW)
             canvas.drawPath(bodyPath, bodyPaint)
 
             canvas.save()
             canvas.clipPath(bodyPath)
 
-            // 3. Subtle optical glass edge refraction along lower curve (gives physical glass thickness)
-            depthPaint.shader = LinearGradient(
-                0f,
-                bodyRect.top + (bodyRect.height() * 0.56f),
-                0f,
-                bodyRect.bottom,
-                intArrayOf(0x001B3C52, 0x0D1B3C52, 0x1C1B3C52),
-                floatArrayOf(0f, 0.62f, 1f),
-                Shader.TileMode.CLAMP,
-            )
-            canvas.drawRect(bodyRect, depthPaint)
+            // 3. Subtle optical glass edge refraction along lower curve
+            if (enabled) {
+                depthPaint.shader = LinearGradient(
+                    0f,
+                    bodyRect.top + (bodyRect.height() * 0.56f),
+                    0f,
+                    bodyRect.bottom,
+                    intArrayOf(0x001B3C52, 0x0D1B3C52, 0x1C1B3C52),
+                    floatArrayOf(0f, 0.62f, 1f),
+                    Shader.TileMode.CLAMP,
+                )
+                canvas.drawRect(bodyRect, depthPaint)
+            }
 
             // 4. Curved Vista × Liquid Glass upper specular reflection band
             val glossHeight = bodyRect.height() * 0.50f
@@ -435,13 +1066,13 @@ object AeroGlassUi {
             )
             glossPath.close()
 
-            val topGloss = Color.argb(
-                if (pressed) (tone.glossAlpha * 0.70f).toInt() else tone.glossAlpha,
-                255,
-                255,
-                255,
-            )
-            val botGloss = Color.argb(if (pressed) 26 else 64, 255, 255, 255)
+            val glossMult = when {
+                !enabled -> 0.55f
+                effPressed -> 0.70f
+                else -> 1f
+            }
+            val topGloss = Color.argb((tone.glossAlpha * glossMult).toInt(), 255, 255, 255)
+            val botGloss = Color.argb(if (!enabled) 18 else if (effPressed) 26 else 64, 255, 255, 255)
             glossPaint.shader = LinearGradient(
                 0f,
                 glossRect.top,
@@ -453,17 +1084,19 @@ object AeroGlassUi {
             )
             canvas.drawPath(glossPath, glossPaint)
 
-            // 5. Luminous pure-crystal bottom internal caustic light bounce (signature Liquid Glass)
-            val bounceR = (bodyRect.width() * 0.52f).coerceAtLeast(1f)
-            causticPaint.shader = RadialGradient(
-                bodyRect.centerX(),
-                bodyRect.bottom + (bodyRect.height() * 0.18f),
-                bounceR,
-                intArrayOf(0xD8FFFFFF.toInt(), 0x55FFFFFF, 0x00FFFFFF),
-                floatArrayOf(0f, 0.45f, 1f),
-                Shader.TileMode.CLAMP,
-            )
-            canvas.drawRect(bodyRect, causticPaint)
+            // 5. Luminous pure-crystal bottom internal caustic light bounce
+            if (enabled) {
+                val bounceR = (bodyRect.width() * 0.52f).coerceAtLeast(1f)
+                causticPaint.shader = RadialGradient(
+                    bodyRect.centerX(),
+                    bodyRect.bottom + (bodyRect.height() * 0.18f),
+                    bounceR,
+                    intArrayOf(0xD8FFFFFF.toInt(), 0x55FFFFFF, 0x00FFFFFF),
+                    floatArrayOf(0f, 0.45f, 1f),
+                    Shader.TileMode.CLAMP,
+                )
+                canvas.drawRect(bodyRect, causticPaint)
+            }
 
             canvas.restore()
 
@@ -481,48 +1114,59 @@ object AeroGlassUi {
                 rimRect.top,
                 0f,
                 rimRect.bottom,
-                intArrayOf(0xFFFFFFFF.toInt(), 0x7AFFFFFF, 0xF0FFFFFF.toInt()),
+                if (enabled) {
+                    intArrayOf(0xFFFFFFFF.toInt(), 0x7AFFFFFF, 0xF0FFFFFF.toInt())
+                } else {
+                    intArrayOf(0xB8FFFFFF.toInt(), 0x48FFFFFF, 0x90FFFFFF.toInt())
+                },
                 floatArrayOf(0f, 0.50f, 1f),
                 Shader.TileMode.CLAMP,
             )
             canvas.drawRoundRect(
                 rimRect,
-                (radius - rimInset).coerceAtLeast(1f),
-                (radius - rimInset).coerceAtLeast(1f),
+                (r - rimInset).coerceAtLeast(1f),
+                (r - rimInset).coerceAtLeast(1f),
                 innerRimPaint,
             )
 
             // 7. Ultra-crisp top-edge glass sparkle line
-            topHighlightPaint.strokeWidth = strokeW * 0.7f
-            topHighlightPaint.shader = LinearGradient(
-                bodyRect.left + radius,
-                bodyRect.top,
-                bodyRect.right - radius,
-                bodyRect.top,
-                intArrayOf(0x00FFFFFF, 0xFFFFFFFF.toInt(), 0x00FFFFFF),
-                floatArrayOf(0f, 0.5f, 1f),
-                Shader.TileMode.CLAMP,
-            )
-            canvas.drawLine(
-                bodyRect.left + (radius * 0.65f),
-                bodyRect.top + strokeW,
-                bodyRect.right - (radius * 0.65f),
-                bodyRect.top + strokeW,
-                topHighlightPaint,
-            )
+            if (enabled) {
+                topHighlightPaint.strokeWidth = strokeW * 0.7f
+                topHighlightPaint.shader = LinearGradient(
+                    bodyRect.left + r,
+                    bodyRect.top,
+                    bodyRect.right - r,
+                    bodyRect.top,
+                    intArrayOf(0x00FFFFFF, 0xFFFFFFFF.toInt(), 0x00FFFFFF),
+                    floatArrayOf(0f, 0.5f, 1f),
+                    Shader.TileMode.CLAMP,
+                )
+                canvas.drawLine(
+                    bodyRect.left + (r * 0.65f),
+                    bodyRect.top + strokeW,
+                    bodyRect.right - (r * 0.65f),
+                    bodyRect.top + strokeW,
+                    topHighlightPaint,
+                )
+            }
 
             // 8. Sleek refractive crystal outer contour
             outerContourPaint.strokeWidth = strokeW * 0.95f
+            val contourScale = if (enabled) 1f else 0.55f
             outerContourPaint.shader = LinearGradient(
                 0f,
                 bodyRect.top,
                 0f,
                 bodyRect.bottom,
-                intArrayOf(tone.outerContourTop, 0x3A8AA6B8, tone.outerContourBottom),
+                intArrayOf(
+                    scaleAlpha(tone.outerContourTop, contourScale),
+                    scaleAlpha(0x3A8AA6B8, contourScale),
+                    scaleAlpha(tone.outerContourBottom, contourScale),
+                ),
                 floatArrayOf(0f, 0.50f, 1f),
                 Shader.TileMode.CLAMP,
             )
-            canvas.drawRoundRect(bodyRect, radius, radius, outerContourPaint)
+            canvas.drawRoundRect(bodyRect, r, r, outerContourPaint)
         }
 
         private fun tintDown(color: Int, factor: Float): Int = Color.argb(
@@ -532,12 +1176,135 @@ object AeroGlassUi {
             (Color.blue(color) * factor).toInt().coerceIn(0, 255),
         )
 
+        private fun scaleAlpha(color: Int, factor: Float): Int = Color.argb(
+            (Color.alpha(color) * factor).toInt().coerceIn(0, 255),
+            Color.red(color),
+            Color.green(color),
+            Color.blue(color),
+        )
+
         override fun setAlpha(alpha: Int) {
             bodyPaint.alpha = alpha
         }
 
         override fun setColorFilter(colorFilter: ColorFilter?) {
             bodyPaint.colorFilter = colorFilter
+        }
+
+        @Deprecated("Deprecated in Java")
+        override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+    }
+
+    /** Frosted Liquid Glass input surface with crisp sky-accented focus border. */
+    private class LiquidGlassInputDrawable(context: Context) : Drawable() {
+        private val radius = dpF(context, 16f)
+        private val inset = dpF(context, 1.5f)
+        private val strokeW = dpF(context, 1.2f)
+
+        private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+        private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+        private val rect = RectF()
+
+        private var focused = false
+
+        override fun isStateful(): Boolean = true
+
+        override fun onStateChange(state: IntArray): Boolean {
+            val nowFocused = state.contains(android.R.attr.state_focused)
+            if (nowFocused != focused) {
+                focused = nowFocused
+                invalidateSelf()
+                return true
+            }
+            return false
+        }
+
+        override fun draw(canvas: Canvas) {
+            val b = bounds
+            if ((b.width() <= 0) || (b.height() <= 0)) return
+            rect.set(b.left + inset, b.top + inset, b.right - inset, b.bottom - inset)
+
+            fillPaint.shader = LinearGradient(
+                0f,
+                rect.top,
+                0f,
+                rect.bottom,
+                intArrayOf(0xF2F7FBFD.toInt(), 0xFAFFFFFF.toInt()),
+                floatArrayOf(0f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+            canvas.drawRoundRect(rect, radius, radius, fillPaint)
+
+            rimPaint.strokeWidth = strokeW
+            rimPaint.color = 0xD8FFFFFF.toInt()
+            val inner = RectF(
+                rect.left + strokeW,
+                rect.top + strokeW,
+                rect.right - strokeW,
+                rect.bottom - strokeW,
+            )
+            canvas.drawRoundRect(inner, (radius - strokeW).coerceAtLeast(1f), (radius - strokeW).coerceAtLeast(1f), rimPaint)
+
+            borderPaint.strokeWidth = if (focused) strokeW * 1.4f else strokeW * 0.95f
+            borderPaint.color = if (focused) 0xBB3E8EBA.toInt() else 0x587B9DB2
+            canvas.drawRoundRect(rect, radius, radius, borderPaint)
+        }
+
+        override fun setAlpha(alpha: Int) {
+            fillPaint.alpha = alpha
+        }
+
+        override fun setColorFilter(colorFilter: ColorFilter?) {
+            fillPaint.colorFilter = colorFilter
+        }
+
+        @Deprecated("Deprecated in Java")
+        override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+    }
+
+    /** Glossy rounded Aero progress bar fill drawable. */
+    private class GlossyBarDrawable(
+        context: Context,
+        private val baseColor: Int,
+    ) : Drawable() {
+        private val radius = dpF(context, 10f)
+        private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val sheenPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val rect = RectF()
+        private val path = Path()
+
+        override fun draw(canvas: Canvas) {
+            val b = bounds
+            if ((b.width() <= 0) || (b.height() <= 0)) return
+            rect.set(b.left.toFloat(), b.top.toFloat(), b.right.toFloat(), b.bottom.toFloat())
+            val r = min(radius, rect.height() * 0.5f)
+            fillPaint.color = baseColor
+            path.reset()
+            path.addRoundRect(rect, r, r, Path.Direction.CW)
+            canvas.drawPath(path, fillPaint)
+
+            canvas.save()
+            canvas.clipPath(path)
+            sheenPaint.shader = LinearGradient(
+                0f,
+                rect.top,
+                0f,
+                rect.top + (rect.height() * 0.55f),
+                0x88FFFFFF.toInt(),
+                0x00FFFFFF,
+                Shader.TileMode.CLAMP,
+            )
+            canvas.drawRect(rect.left, rect.top, rect.right, rect.top + (rect.height() * 0.55f), sheenPaint)
+            canvas.restore()
+        }
+
+        override fun setAlpha(alpha: Int) {
+            fillPaint.alpha = alpha
+        }
+
+        override fun setColorFilter(colorFilter: ColorFilter?) {
+            fillPaint.colorFilter = colorFilter
         }
 
         @Deprecated("Deprecated in Java")
@@ -576,14 +1343,19 @@ object AeroGlassUi {
             if ((b.width() <= 0) || (b.height() <= 0)) return
 
             rect.set(b.left + insetX, b.top + insetTop, b.right - insetX, b.bottom - insetBottom)
-            shadowRect.set(
-                rect.left + insetX,
-                rect.top + (insetBottom * 0.72f),
-                rect.right - insetX,
-                rect.bottom + (insetBottom * 0.72f),
-            )
-            shadowPaint.color = shadowColor
-            canvas.drawRoundRect(shadowRect, radius, radius, shadowPaint)
+            if ((rect.width() <= 0f) || (rect.height() <= 0f)) return
+            val r = min(radius, min(rect.width(), rect.height()) * 0.5f)
+
+            if (Color.alpha(shadowColor) > 0) {
+                shadowRect.set(
+                    rect.left + insetX,
+                    rect.top + (insetBottom * 0.72f),
+                    rect.right - insetX,
+                    rect.bottom + (insetBottom * 0.72f),
+                )
+                shadowPaint.color = shadowColor
+                canvas.drawRoundRect(shadowRect, r, r, shadowPaint)
+            }
 
             fillPaint.shader = LinearGradient(
                 0f,
@@ -595,7 +1367,7 @@ object AeroGlassUi {
                 Shader.TileMode.CLAMP,
             )
             path.reset()
-            path.addRoundRect(rect, radius, radius, Path.Direction.CW)
+            path.addRoundRect(rect, r, r, Path.Direction.CW)
             canvas.drawPath(path, fillPaint)
 
             canvas.save()
@@ -628,14 +1400,14 @@ object AeroGlassUi {
             )
             canvas.drawRoundRect(
                 innerRect,
-                (radius - strokeW).coerceAtLeast(1f),
-                (radius - strokeW).coerceAtLeast(1f),
+                (r - strokeW).coerceAtLeast(1f),
+                (r - strokeW).coerceAtLeast(1f),
                 rimPaint,
             )
 
             borderPaint.strokeWidth = strokeW * 0.9f
             borderPaint.color = strokeTint
-            canvas.drawRoundRect(rect, radius, radius, borderPaint)
+            canvas.drawRoundRect(rect, r, r, borderPaint)
         }
 
         override fun setAlpha(alpha: Int) {
@@ -648,5 +1420,22 @@ object AeroGlassUi {
 
         @Deprecated("Deprecated in Java")
         override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+    }
+
+    private class MaxHeightScrollView(
+        context: Context,
+        private val maxHeightPx: Int,
+    ) : ScrollView(context) {
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val capped = MeasureSpec.makeMeasureSpec(maxHeightPx, MeasureSpec.AT_MOST)
+            val mode = MeasureSpec.getMode(heightMeasureSpec)
+            val size = MeasureSpec.getSize(heightMeasureSpec)
+            val finalHeightSpec = if ((mode != MeasureSpec.UNSPECIFIED) && (size < maxHeightPx)) {
+                heightMeasureSpec
+            } else {
+                capped
+            }
+            super.onMeasure(widthMeasureSpec, finalHeightSpec)
+        }
     }
 }

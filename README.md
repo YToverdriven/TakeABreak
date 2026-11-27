@@ -1,6 +1,6 @@
 # Take a Break
 
-**Version 0.12.2**
+**Version 1.0**
 
 Take a Break is an offline Android accountability suite for people who want to spend less time on their phones.
 
@@ -43,4 +43,4 @@ Instead of relying on willpower alone—or sending your usage data to a cloud ac
 ## Documentation
 
 - **[Technical Architecture & How It Works (ARCHITECTURE.md)](ARCHITECTURE.md)** — Deep dive into the two-app trust model, multi-window/split-screen blocking, `AccessPolicy`, overlay window design, PIN session locking, inter-app broadcasts, durable SMS retry queue, permissions, and building/signing release APKs.
-- **[Version Notes (VERSION_NOTES.md)](VERSION_NOTES.md)** — Full release history and changelog. *(Version 1.0 is reserved until the apps are feature-complete.)*
+- **[Version Notes (VERSION_NOTES.md)](VERSION_NOTES.md)** — Full release history and changelog.

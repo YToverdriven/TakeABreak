@@ -2,9 +2,7 @@ package com.takeabreak.controller
 
 import android.Manifest
 import android.app.Activity
-import android.app.AlertDialog
 import android.app.Dialog
-import android.app.TimePickerDialog
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -20,14 +18,10 @@ import android.text.TextWatcher
 import android.text.format.DateFormat
 import android.view.Gravity
 import android.view.View
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import android.widget.Button
-import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -238,8 +232,6 @@ class PermissionsSetupActivity : Activity() {
 
     private fun initialStep(): Int {
         if (!isFirstSetup) return STEP_ACCESSIBILITY
-        // If setup was interrupted after the PIN was already saved on Screen 6,
-        // resume at App Blocking / Time Limits without allowing the PIN to be overwritten.
         if (Prefs.isPinSet(this) && Prefs.isSetupInProgress(this)) {
             val saved = Prefs.getSetupStep(this)
             return if (saved == STEP_TIME_LIMITS) STEP_TIME_LIMITS else STEP_APP_BLOCKING
@@ -329,15 +321,40 @@ class PermissionsSetupActivity : Activity() {
     // ---- Screen 1: Welcome ----
 
     private fun renderStep1Welcome() {
-        val column = baseColumn()
-        column.addView(headingView("Welcome to Take a Break"))
+        val dp = { value: Float -> AeroGlassUi.dp(this, value) }
+        val column = baseColumn().apply {
+            gravity = Gravity.CENTER
+        }
+        column.addView(AeroGlassUi.createTitle(this, "Welcome to Take a Break", sizeSp = 32f, centered = true))
         column.addView(
-            bodyView(
-                "Take a Break is an accountability application for those who want to spend less time on their phones.",
-            ),
+            TakeABreakWindowView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(248f), dp(192f)).apply {
+                    gravity = Gravity.CENTER_HORIZONTAL
+                    topMargin = dp(8f)
+                    bottomMargin = dp(16f)
+                }
+            },
         )
+        val infoCard = AeroGlassUi.createGlassCard(this, cornerDp = 24f).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                bottomMargin = dp(16f)
+            }
+            addView(
+                AeroGlassUi.createBodyText(
+                    this@PermissionsSetupActivity,
+                    "Take a Break is an accountability application for those who want to spend less time on their phones.",
+                    centered = true,
+                ).apply {
+                    setPadding(0, dp(2f), 0, dp(2f))
+                },
+            )
+        }
+        column.addView(infoCard)
         column.addView(
-            primaryButton("Begin Setup") {
+            primaryButton("Begin Setup", AeroGlassUi.GlassTone.LIQUID_SKY) {
                 goToStep(STEP_ACCESSIBILITY)
             },
         )
@@ -353,7 +370,7 @@ class PermissionsSetupActivity : Activity() {
         }
         column.addView(headingView("Enable Accessibility Service"))
         column.addView(
-            bodyView(
+            infoCard(
                 "Accessibility Service allows Take a Break to monitor usage and manage time- or PIN-related restrictions. Take a Break does not connect to the internet or share your information beyond what you allow.",
             ),
         )
@@ -361,7 +378,7 @@ class PermissionsSetupActivity : Activity() {
         val accBtn = primaryButton("Enable Accessibility Service") {
             showAccessibilityExplanationDialog()
         }
-        val nextBtn = primaryButton("Next") {
+        val nextBtn = primaryButton("Next", AeroGlassUi.GlassTone.LIQUID_SKY) {
             goToStep(STEP_SMS)
         }
 
@@ -385,17 +402,18 @@ class PermissionsSetupActivity : Activity() {
 
     private fun showAccessibilityExplanationDialog() {
         showManagedDialog(
-            AlertDialog.Builder(this)
-                .setTitle("Enable Accessibility Service")
-                .setMessage(
-                    "The option to enable Accessibility Service may be greyed out if the app was downloaded from an unofficial source. Please try tapping the permission anyway. Dismiss any pop-up concerning restricted settings. You will then be able to enable restricted settings if required by your Android version.",
-                )
-                .setPositiveButton("I Understand") { _, _ ->
+            AeroGlassUi.createGlassDialog(
+                context = this,
+                title = "Enable Accessibility Service",
+                message = "The option to enable Accessibility Service may be greyed out if the app was downloaded from an unofficial source. Please try tapping the permission anyway. Dismiss any pop-up concerning restricted settings. You will then be able to enable restricted settings if required by your Android version.",
+                positiveText = "I Understand",
+                onPositive = { dlg ->
+                    dlg.dismiss()
                     awaitingAccessibilityReturn = true
                     openAccessibilitySettings()
-                }
-                .setCancelable(true)
-                .create(),
+                },
+                cancelable = true,
+            ),
         )
     }
 
@@ -408,18 +426,18 @@ class PermissionsSetupActivity : Activity() {
         }
         column.addView(headingView("Continuing Permissions Setup"))
         column.addView(
-            bodyView(
+            infoCard(
                 "You are viewing this screen because Accessibility Service was not enabled. If Accessibility Service was blocked, enable restricted settings first, then try tapping Take a Break in Accessibility Settings again.",
             ),
         )
 
-        val restrictedBtn = primaryButton("Restricted Settings") {
+        val restrictedBtn = primaryButton("Restricted Settings", AeroGlassUi.GlassTone.LIQUID_FROST) {
             showRestrictedSettingsDialog(forSms = false)
         }
         val accBtn = primaryButton("Enable Accessibility Service") {
             openAccessibilitySettings()
         }
-        val nextBtn = primaryButton("Next") {
+        val nextBtn = primaryButton("Next", AeroGlassUi.GlassTone.LIQUID_SKY) {
             goToStep(STEP_SMS)
         }
 
@@ -445,19 +463,20 @@ class PermissionsSetupActivity : Activity() {
     // ---- Screen 4: Enable SMS Permission ----
 
     private fun renderStep4Sms() {
+        val dp = { value: Float -> AeroGlassUi.dp(this, value) }
         val column = baseColumn()
         if (!isFirstSetup) {
             column.addView(menuBackButton())
         }
         column.addView(headingView("Set Up Text Message Alerts"))
         column.addView(
-            bodyView("SMS permission may also require restricted settings to be enabled."),
+            infoCard("SMS permission may also require restricted settings to be enabled."),
         )
 
         val smsBtn = primaryButton("Grant SMS Permission") {
             requestPermissions(arrayOf(Manifest.permission.SEND_SMS), SMS_REQUEST)
         }
-        val restrictedBtn = primaryButton("Restricted Settings") {
+        val restrictedBtn = primaryButton("Restricted Settings", AeroGlassUi.GlassTone.LIQUID_FROST) {
             showRestrictedSettingsDialog(forSms = true)
         }
 
@@ -467,11 +486,17 @@ class PermissionsSetupActivity : Activity() {
         column.addView(restrictedBtn)
 
         if (isFirstSetup) {
-            val phoneLabel = TextView(this).apply {
-                text = "Enter Phone Number (Optional)"
-                textSize = 16f
-                setPadding(0, 28, 0, 8)
+            val phoneCard = AeroGlassUi.createGlassCard(this, cornerDp = 22f).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply {
+                    topMargin = dp(12f)
+                    bottomMargin = dp(10f)
+                }
             }
+
+            val phoneLabel = AeroGlassUi.createSectionTitle(this, "Enter Phone Number (Optional)")
 
             val phoneRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -479,37 +504,31 @@ class PermissionsSetupActivity : Activity() {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT,
-                )
+                ).apply {
+                    topMargin = dp(4f)
+                }
             }
 
-            val countrySpinner = Spinner(this).apply {
-                adapter = ArrayAdapter(
-                    this@PermissionsSetupActivity,
-                    android.R.layout.simple_spinner_dropdown_item,
-                    COUNTRY_CODES.map { it.label },
-                )
-                setSelection(selectedCountryIndex.coerceIn(0, COUNTRY_CODES.lastIndex))
-                onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-                    override fun onItemSelected(
-                        parent: AdapterView<*>?,
-                        view: View?,
-                        position: Int,
-                        id: Long,
-                    ) {
-                        selectedCountryIndex = position
-                    }
-
-                    override fun onNothingSelected(parent: AdapterView<*>?) {}
-                }
+            val countrySpinner = AeroGlassUi.createGlassSpinner(
+                context = this,
+                items = COUNTRY_CODES.map { it.label },
+                selectedIndex = selectedCountryIndex,
+            ) { position ->
+                selectedCountryIndex = position
+            }.apply {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT,
-                )
+                ).apply {
+                    marginEnd = dp(8f)
+                }
             }
 
-            val phoneInput = EditText(this).apply {
-                hint = "555-123-4567"
-                inputType = InputType.TYPE_CLASS_PHONE
+            val phoneInput = AeroGlassUi.createGlassInput(
+                this,
+                "555-123-4567",
+                InputType.TYPE_CLASS_PHONE,
+            ).apply {
                 setText(phoneDraft)
                 setSelection(text?.length ?: 0)
                 layoutParams = LinearLayout.LayoutParams(
@@ -528,64 +547,75 @@ class PermissionsSetupActivity : Activity() {
 
             phoneRow.addView(countrySpinner)
             phoneRow.addView(phoneInput)
-            column.addView(phoneLabel)
-            column.addView(phoneRow)
+            phoneCard.addView(phoneLabel)
+            phoneCard.addView(phoneRow)
+            column.addView(phoneCard)
 
-            val togglesHeader = TextView(this).apply {
-                text = "Send an SMS when:"
-                textSize = 16f
-                setPadding(0, 24, 0, 8)
-            }
-
-            val newAppCb = CheckBox(this).apply {
-                text = "A new app is installed"
-                isChecked = Prefs.isAlertNewAppEnabled(this@PermissionsSetupActivity)
-                setOnCheckedChangeListener { _, checked ->
-                    Prefs.setAlertNewAppEnabled(this@PermissionsSetupActivity, checked)
+            val togglesCard = AeroGlassUi.createGlassCard(this, cornerDp = 22f).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply {
+                    bottomMargin = dp(10f)
                 }
             }
 
-            val tamperCb = CheckBox(this).apply {
-                text = "Take a Break or Watcher is deleted, disabled, reset, or accessibility is turned off"
-                isChecked = Prefs.isAlertTamperEnabled(this@PermissionsSetupActivity)
-                setOnCheckedChangeListener { _, checked ->
-                    Prefs.setAlertTamperEnabled(this@PermissionsSetupActivity, checked)
-                    WatcherMessages.syncConfig(this@PermissionsSetupActivity)
-                }
+            val togglesHeader = AeroGlassUi.createSectionTitle(this, "Send an SMS when:")
+
+            val newAppCb = AeroGlassUi.createGlassCheckBox(
+                this,
+                "A new app is installed",
+                Prefs.isAlertNewAppEnabled(this),
+            ) { checked ->
+                Prefs.setAlertNewAppEnabled(this@PermissionsSetupActivity, checked)
             }
 
-            val dayUnlockCb = CheckBox(this).apply {
-                text = "PIN is entered to unlock a blocked app"
-                isChecked = Prefs.isAlertDayUnlockEnabled(this@PermissionsSetupActivity)
-                setOnCheckedChangeListener { _, checked ->
-                    Prefs.setAlertDayUnlockEnabled(this@PermissionsSetupActivity, checked)
-                }
+            val tamperCb = AeroGlassUi.createGlassCheckBox(
+                this,
+                "Take a Break or Watcher is deleted, disabled, reset, or accessibility is turned off",
+                Prefs.isAlertTamperEnabled(this),
+            ) { checked ->
+                Prefs.setAlertTamperEnabled(this@PermissionsSetupActivity, checked)
+                WatcherMessages.syncConfig(this@PermissionsSetupActivity)
             }
 
-            val dailyStatusCb = CheckBox(this).apply {
-                text = "Once-a-day status check"
-                isChecked = Prefs.isDailyStatusEnabled(this@PermissionsSetupActivity)
-                setOnCheckedChangeListener { _, checked ->
-                    Prefs.setDailyStatusEnabled(this@PermissionsSetupActivity, checked)
-                    DailyStatusWorker.syncSchedule(this@PermissionsSetupActivity)
-                    refreshStep4DailyTimeUi()
-                }
+            val dayUnlockCb = AeroGlassUi.createGlassCheckBox(
+                this,
+                "PIN is entered to unlock a blocked app",
+                Prefs.isAlertDayUnlockEnabled(this),
+            ) { checked ->
+                Prefs.setAlertDayUnlockEnabled(this@PermissionsSetupActivity, checked)
+            }
+
+            val dailyStatusCb = AeroGlassUi.createGlassCheckBox(
+                this,
+                "Once-a-day status check",
+                Prefs.isDailyStatusEnabled(this),
+            ) { checked ->
+                Prefs.setDailyStatusEnabled(this@PermissionsSetupActivity, checked)
+                DailyStatusWorker.syncSchedule(this@PermissionsSetupActivity)
+                refreshStep4DailyTimeUi()
             }
 
             val timeRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(36, 4, 0, 12)
+                setPadding(dp(28f), dp(6f), 0, dp(4f))
             }
 
             val dailyTimeLabel = TextView(this).apply {
-                textSize = 15f
+                textSize = 14.5f
+                typeface = AeroGlassUi.minimalistFont(light = false)
+                setTextColor(AeroGlassUi.TEXT_SECONDARY)
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
 
-            val changeTimeBtn = Button(this).apply {
-                text = "Change Time"
-                setOnClickListener { showStep4TimePicker() }
+            val changeTimeBtn = AeroGlassUi.createCompactGlassButton(
+                this,
+                "Change Time",
+                AeroGlassUi.GlassTone.LIQUID_CLEAR,
+            ) {
+                showStep4TimePicker()
             }
 
             step4DailyTimeLabel = dailyTimeLabel
@@ -593,22 +623,35 @@ class PermissionsSetupActivity : Activity() {
             timeRow.addView(dailyTimeLabel)
             timeRow.addView(changeTimeBtn)
 
-            column.addView(togglesHeader)
-            column.addView(newAppCb)
-            column.addView(tamperCb)
-            column.addView(dayUnlockCb)
-            column.addView(dailyStatusCb)
-            column.addView(timeRow)
+            togglesCard.addView(togglesHeader)
+            togglesCard.addView(newAppCb)
+            togglesCard.addView(AeroGlassUi.createDivider(this, verticalMarginDp = 3f))
+            togglesCard.addView(tamperCb)
+            togglesCard.addView(AeroGlassUi.createDivider(this, verticalMarginDp = 3f))
+            togglesCard.addView(dayUnlockCb)
+            togglesCard.addView(AeroGlassUi.createDivider(this, verticalMarginDp = 3f))
+            togglesCard.addView(dailyStatusCb)
+            togglesCard.addView(timeRow)
+            column.addView(togglesCard)
         } else {
-            val lockedNote = TextView(this).apply {
-                text = "Alert phone number and SMS alert settings require your PIN. Open Text Message Alerts from the home screen to make changes."
-                textSize = 14f
-                setPadding(0, 24, 0, 8)
-            }
-            column.addView(lockedNote)
+            column.addView(
+                AeroGlassUi.createGlassNotice(
+                    this,
+                    "Alert phone number and SMS alert settings require your PIN. Open Text Message Alerts from the home screen to make changes.",
+                    isWarning = false,
+                ).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ).apply {
+                        topMargin = dp(10f)
+                        bottomMargin = dp(8f)
+                    }
+                },
+            )
         }
 
-        val nextBtn = primaryButton("Next") {
+        val nextBtn = primaryButton("Next", AeroGlassUi.GlassTone.LIQUID_SKY) {
             if (isFirstSetup && !saveOptionalPhoneNumber()) {
                 return@primaryButton
             }
@@ -636,18 +679,18 @@ class PermissionsSetupActivity : Activity() {
         val minute = Prefs.getDailyStatusMinute(this)
         val is24Hour = DateFormat.is24HourFormat(this)
         showManagedDialog(
-            TimePickerDialog(
-                this,
-                { _, selectedHour, selectedMinute ->
-                    Prefs.setDailyStatusTime(this, selectedHour, selectedMinute)
-                    DailyStatusWorker.syncSchedule(this)
-                    refreshStep4DailyTimeUi()
-                    toast("Daily status time set to ${formatTime(selectedHour, selectedMinute)}")
-                },
-                hour,
-                minute,
-                is24Hour,
-            ),
+            AeroGlassUi.createGlassTimePickerDialog(
+                context = this,
+                title = "Daily Status Time",
+                initialHour = hour,
+                initialMinute = minute,
+                is24Hour = is24Hour,
+            ) { selectedHour, selectedMinute ->
+                Prefs.setDailyStatusTime(this, selectedHour, selectedMinute)
+                DailyStatusWorker.syncSchedule(this)
+                refreshStep4DailyTimeUi()
+                toast("Daily status time set to ${formatTime(selectedHour, selectedMinute)}")
+            },
         )
     }
 
@@ -744,6 +787,7 @@ class PermissionsSetupActivity : Activity() {
     }
 
     private fun renderStep5Watcher() {
+        val dp = { value: Float -> AeroGlassUi.dp(this, value) }
         val column = baseColumn()
         if (!isFirstSetup) {
             column.addView(menuBackButton())
@@ -753,15 +797,23 @@ class PermissionsSetupActivity : Activity() {
         val disabled = PeerLink.isWatcherDisabled(this)
 
         if (watcherAlreadySetUpOnArrival && installed && watcherSetupConfirmed) {
-            // Special screen: Watcher is already set up.
             column.addView(headingView("Watcher Is Already Set Up"))
             column.addView(
-                bodyView(
+                TakeABreakWindowView(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(dp(186f), dp(144f)).apply {
+                        gravity = Gravity.CENTER_HORIZONTAL
+                        topMargin = dp(4f)
+                        bottomMargin = dp(12f)
+                    }
+                },
+            )
+            column.addView(
+                infoCard(
                     "Take a Break Watcher is installed and ready to send SMS alerts if Take a Break is ever disabled or deleted.",
                 ),
             )
             column.addView(
-                primaryButton(if (isFirstSetup) "Next" else "Done") {
+                primaryButton(if (isFirstSetup) "Next" else "Done", AeroGlassUi.GlassTone.LIQUID_SKY) {
                     proceedPastStep5()
                 },
             )
@@ -777,16 +829,16 @@ class PermissionsSetupActivity : Activity() {
             } else {
                 "Take a Break Watcher must be installed to alert via SMS if Take a Break is ever disabled or deleted."
             }
-            column.addView(bodyView(message))
+            column.addView(AeroGlassUi.createGlassNotice(this, message, isWarning = true))
         } else if (watcherProbePending) {
-            column.addView(bodyView("Checking Take a Break Watcher status..."))
+            column.addView(infoCard("Checking Take a Break Watcher status..."))
         } else if (watcherSetupConfirmed) {
             column.addView(
-                bodyView("Take a Break Watcher setup is complete and SMS permissions are granted."),
+                infoCard("Take a Break Watcher setup is complete and SMS permissions are granted."),
             )
         } else {
             column.addView(
-                bodyView(
+                infoCard(
                     "Take a Break Watcher is installed, but its SMS permissions setup is not complete yet.",
                 ),
             )
@@ -797,7 +849,10 @@ class PermissionsSetupActivity : Activity() {
             )
         }
 
-        val continueBtn = primaryButton(if (isFirstSetup) "Continue" else "Done") {
+        val continueBtn = primaryButton(
+            if (isFirstSetup) "Continue" else "Done",
+            AeroGlassUi.GlassTone.LIQUID_SKY,
+        ) {
             proceedPastStep5()
         }.apply {
             isEnabled = installed && watcherSetupConfirmed
@@ -835,37 +890,47 @@ class PermissionsSetupActivity : Activity() {
     // ---- Screen 6: Set a PIN ----
 
     private fun renderStep6Pin() {
+        val dp = { value: Float -> AeroGlassUi.dp(this, value) }
         val column = baseColumn()
         column.addView(headingView("Thank You for Your Patience."))
-        column.addView(
-            TextView(this).apply {
-                text = "Set a PIN: 4 digits or longer."
-                textSize = 17f
-                setPadding(0, 8, 0, 12)
-            },
-        )
-        column.addView(
-            bodyView(
+
+        val formCard = AeroGlassUi.createGlassCard(this, cornerDp = 24f).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                bottomMargin = dp(12f)
+            }
+        }
+        formCard.addView(AeroGlassUi.createSectionTitle(this, "Set a PIN: 4 digits or longer."))
+        formCard.addView(
+            AeroGlassUi.createBodyText(
+                this,
                 "We highly recommend that the user of this phone avoid knowing the PIN. Someone else close to the user should set the PIN to avoid the temptation to simply bypass the limits. Whoever sets the PIN should write it down in a secure place. If there is an emergency or a critical error, Take a Break can still be deleted.",
+                secondary = true,
             ),
         )
 
-        val pinInput = EditText(this).apply {
-            hint = "Enter PIN (4+ digits)"
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        val pinInput = AeroGlassUi.createGlassInput(
+            this,
+            "Enter PIN (4+ digits)",
+            InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD,
+        ).apply {
             setText(pinDraft)
             setSelection(text?.length ?: 0)
         }
-        val confirmInput = EditText(this).apply {
-            hint = "Confirm PIN"
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        val confirmInput = AeroGlassUi.createGlassInput(
+            this,
+            "Confirm PIN",
+            InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD,
+        ).apply {
             setText(pinConfirmDraft)
             setSelection(text?.length ?: 0)
         }
         step6PinInput = pinInput
         step6ConfirmInput = confirmInput
 
-        val saveBtn = primaryButton("Save PIN") {
+        val saveBtn = primaryButton("Save PIN", AeroGlassUi.GlassTone.LIQUID_SKY) {
             val pin = pinInput.text?.toString().orEmpty()
             val confirm = confirmInput.text?.toString().orEmpty()
             if (pin.length < 4) {
@@ -883,9 +948,10 @@ class PermissionsSetupActivity : Activity() {
             goToStep(STEP_APP_BLOCKING)
         }
 
-        column.addView(pinInput)
-        column.addView(confirmInput)
-        column.addView(saveBtn)
+        formCard.addView(pinInput)
+        formCard.addView(confirmInput)
+        formCard.addView(saveBtn)
+        column.addView(formCard)
         setScrollContent(column)
     }
 
@@ -901,71 +967,94 @@ class PermissionsSetupActivity : Activity() {
             lockedPackagesLoaded = true
         }
 
+        val dp = { value: Float -> AeroGlassUi.dp(this, value) }
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(32, 24, 32, 24)
         }
 
         root.addView(headingView("Set Up App Blocking"))
-        root.addView(subheadingView("Apps can be added or removed later (PIN must be entered)."))
         root.addView(
-            bodyView(
-                "Block apps without a PIN entry. These apps will now only be usable while supervised.",
-            ),
-        )
-        root.addView(
-            noteView("Suggestions: VPNs, Unrestricted Browsers, Shopping apps, Social Media."),
-        )
-        root.addView(
-            noteView("Apps like Phone and Settings cannot be blocked."),
+            AeroGlassUi.createGlassNotice(
+                this,
+                "Apps can be added or removed later (PIN must be entered).\n" +
+                    "Block apps without a PIN entry. These apps will now only be usable while supervised.\n" +
+                    "Suggestions: VPNs, Unrestricted Browsers, Shopping apps, Social Media.\n" +
+                    "Apps like Phone and Settings cannot be blocked.",
+                isWarning = false,
+            ).apply {
+                gravity = Gravity.START
+            },
         )
 
-        val listContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+        val listContainer = AeroGlassUi.createGlassCard(this, cornerDp = 22f).apply {
+            setPadding(dp(14f), dp(8f), dp(14f), dp(10f))
         }
 
         val apps = AppList.controllableApps(this)
-        for ((pkg, label) in apps) {
+        apps.forEachIndexed { index, (pkg, label) ->
+            if (index > 0) {
+                listContainer.addView(AeroGlassUi.createDivider(this, verticalMarginDp = 2f))
+            }
+
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
-                setPadding(0, 8, 0, 8)
                 gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(4f), dp(8f), dp(4f), dp(8f))
             }
 
-            val cb = CheckBox(this).apply {
-                isChecked = selectedLockedPackages.contains(pkg)
-                setOnCheckedChangeListener { _, isChecked ->
-                    if (isChecked) {
-                        selectedLockedPackages.add(pkg)
-                    } else {
-                        selectedLockedPackages.remove(pkg)
-                    }
-                    refreshStep7ActionButton()
+            val cb = AeroGlassUi.createBareGlassCheckBox(this, selectedLockedPackages.contains(pkg)) { isChecked ->
+                if (isChecked) {
+                    selectedLockedPackages.add(pkg)
+                } else {
+                    selectedLockedPackages.remove(pkg)
                 }
+                refreshStep7ActionButton()
             }
 
-            val tv = TextView(this).apply {
-                text = getString(R.string.app_row_format, label, pkg)
-                textSize = 14f
-                setPadding(16, 0, 0, 0)
-                setOnClickListener { cb.isChecked = !cb.isChecked }
+            val textCol = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(10f), 0, 0, 0)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
 
+            textCol.addView(
+                TextView(this).apply {
+                    text = label
+                    textSize = 15.5f
+                    typeface = AeroGlassUi.minimalistFont(light = false)
+                    setTextColor(AeroGlassUi.TEXT_BLACK)
+                },
+            )
+            textCol.addView(
+                TextView(this).apply {
+                    text = pkg
+                    textSize = 12.5f
+                    typeface = AeroGlassUi.minimalistFont(light = false)
+                    setTextColor(AeroGlassUi.TEXT_SECONDARY)
+                },
+            )
+
+            row.setOnClickListener { cb.isChecked = !cb.isChecked }
             row.addView(cb)
-            row.addView(tv)
+            row.addView(textCol)
             listContainer.addView(row)
         }
 
         val scroll = ScrollView(this).apply {
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
             addView(listContainer)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0,
                 1f,
-            )
+            ).apply {
+                topMargin = dp(8f)
+                bottomMargin = dp(8f)
+            }
         }
 
-        val actionBtn = primaryButton("Skip") {
+        val actionBtn = primaryButton("Skip", AeroGlassUi.GlassTone.LIQUID_SKY) {
             val kept = selectedLockedPackages
                 .asSequence()
                 .filterNot { ProtectedPackages.isProtected(this, it) }
@@ -977,7 +1066,7 @@ class PermissionsSetupActivity : Activity() {
 
         root.addView(scroll)
         root.addView(actionBtn)
-        setContentView(root)
+        setContentView(AeroGlassUi.wrapFixedScreen(this, root))
         refreshStep7ActionButton()
     }
 
@@ -988,88 +1077,112 @@ class PermissionsSetupActivity : Activity() {
     // ---- Screen 8: Set Up Time Limits ----
 
     private fun renderStep8TimeLimits() {
+        val dp = { value: Float -> AeroGlassUi.dp(this, value) }
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(32, 24, 32, 24)
         }
 
-        val backBtn = Button(this).apply {
-            text = "Back"
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            )
-            setOnClickListener { goToStep(STEP_APP_BLOCKING) }
+        val backBtn = AeroGlassUi.createTopBarBackButton(this, "Back") {
+            goToStep(STEP_APP_BLOCKING)
         }
 
         root.addView(backBtn)
         root.addView(headingView("Set Up Time Limits"))
-        root.addView(subheadingView("Limits can be added or removed later (PIN must be entered)."))
         root.addView(
-            bodyView(
-                "Set daily time limits for apps. Once an app reaches its daily limit, it will be blocked until midnight unless unlocked with your PIN.",
-            ),
-        )
-        root.addView(
-            noteView("Suggestions: Social Media, Video Streaming, Games, News."),
-        )
-        root.addView(
-            noteView("Apps like Phone and Settings cannot be blocked."),
+            AeroGlassUi.createGlassNotice(
+                this,
+                "Limits can be added or removed later (PIN must be entered).\n" +
+                    "Set daily time limits for apps. Once an app reaches its daily limit, it will be blocked until midnight unless unlocked with your PIN.\n" +
+                    "Suggestions: Social Media, Video Streaming, Games, News.\n" +
+                    "Apps like Phone and Settings cannot be blocked.",
+                isWarning = false,
+            ).apply {
+                gravity = Gravity.START
+            },
         )
 
-        val listContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+        val listContainer = AeroGlassUi.createGlassCard(this, cornerDp = 22f).apply {
+            setPadding(dp(16f), dp(8f), dp(16f), dp(10f))
         }
         step8Container = listContainer
 
         val scroll = ScrollView(this).apply {
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
             addView(listContainer)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0,
                 1f,
-            )
+            ).apply {
+                topMargin = dp(8f)
+                bottomMargin = dp(8f)
+            }
         }
 
-        val actionBtn = primaryButton("Skip") {
+        val actionBtn = primaryButton("Skip", AeroGlassUi.GlassTone.LIQUID_SKY) {
             attemptFinishSetup()
         }
         step8ActionBtn = actionBtn
 
         root.addView(scroll)
         root.addView(actionBtn)
-        setContentView(root)
+        setContentView(AeroGlassUi.wrapFixedScreen(this, root))
         refreshStep8List()
     }
 
     private fun refreshStep8List() {
+        val dp = { value: Float -> AeroGlassUi.dp(this, value) }
         val container = step8Container ?: return
         container.removeAllViews()
         val allLimits = Prefs.getAllLimits(this)
         val apps = AppList.controllableApps(this)
 
-        for ((pkg, label) in apps) {
-            val currentMin = allLimits[pkg] ?: 0
+        apps.forEachIndexed { index, (pkg, label) ->
+            if (index > 0) {
+                container.addView(AeroGlassUi.createDivider(this, verticalMarginDp = 2f))
+            }
 
+            val currentMin = allLimits[pkg] ?: 0
             val row = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(0, 12, 0, 12)
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(4f), dp(10f), dp(4f), dp(10f))
                 setOnClickListener { showSetLimitDialog(pkg, label) }
             }
 
-            val nameTv = TextView(this).apply {
-                text = label
-                textSize = 16f
+            val textCol = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
 
-            val limitTv = TextView(this).apply {
-                text = if (currentMin > 0) "Limit: ${currentMin / 60}h ${currentMin % 60}m" else "No limit"
-                textSize = 13f
-                setTextColor(0xFF666666.toInt())
+            textCol.addView(
+                TextView(this).apply {
+                    text = label
+                    textSize = 15.5f
+                    typeface = AeroGlassUi.minimalistFont(light = false)
+                    setTextColor(AeroGlassUi.TEXT_BLACK)
+                },
+            )
+            textCol.addView(
+                TextView(this).apply {
+                    text = if (currentMin > 0) "Limit: ${currentMin / 60}h ${currentMin % 60}m" else "No limit"
+                    textSize = 13f
+                    typeface = AeroGlassUi.minimalistFont(light = false)
+                    setTextColor(if (currentMin > 0) AeroGlassUi.ACCENT_SKY else AeroGlassUi.TEXT_SECONDARY)
+                },
+            )
+
+            val chevron = TextView(this).apply {
+                text = "\u203A"
+                textSize = 20f
+                typeface = AeroGlassUi.minimalistFont(light = true)
+                setTextColor(AeroGlassUi.TEXT_MUTED)
+                setPadding(dp(12f), 0, dp(4f), 0)
             }
 
-            row.addView(nameTv)
-            row.addView(limitTv)
+            row.addView(textCol)
+            row.addView(chevron)
             container.addView(row)
         }
 
@@ -1077,47 +1190,66 @@ class PermissionsSetupActivity : Activity() {
     }
 
     private fun showSetLimitDialog(pkg: String, label: String) {
+        val dp = { value: Float -> AeroGlassUi.dp(this, value) }
         val current = Prefs.getLimitMinutes(this, pkg)
         val inputLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(32, 16, 32, 16)
             gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(2f), dp(6f), dp(2f), dp(6f))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            )
         }
-        val hoursEt = EditText(this).apply {
-            hint = "Hours"
-            inputType = InputType.TYPE_CLASS_NUMBER
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        val hoursEt = AeroGlassUi.createGlassInput(
+            this,
+            "Hours",
+            InputType.TYPE_CLASS_NUMBER,
+        ).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = dp(6f)
+            }
             if (current > 0) setText((current / 60).toString())
         }
-        val minEt = EditText(this).apply {
-            hint = "Minutes"
-            inputType = InputType.TYPE_CLASS_NUMBER
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        val minEt = AeroGlassUi.createGlassInput(
+            this,
+            "Minutes",
+            InputType.TYPE_CLASS_NUMBER,
+        ).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(6f)
+            }
             if (current > 0) setText((current % 60).toString())
         }
         inputLayout.addView(hoursEt)
-        inputLayout.addView(TextView(this).apply { text = "  " })
         inputLayout.addView(minEt)
 
         showManagedDialog(
-            AlertDialog.Builder(this)
-                .setTitle("Set limit for $label")
-                .setView(inputLayout)
-                .setPositiveButton("Set") { _, _ ->
+            AeroGlassUi.createGlassDialog(
+                context = this,
+                title = "Set limit for $label",
+                customView = inputLayout,
+                positiveText = "Set",
+                onPositive = { dlg ->
                     val h = hoursEt.text.toString().toIntOrNull() ?: 0
                     val m = minEt.text.toString().toIntOrNull() ?: 0
                     val total = ((h * 60) + m).coerceIn(0, (23 * 60) + 59)
                     Prefs.setLimitMinutes(this, pkg, total)
                     toast(if (total > 0) "Limit set" else "Limit cleared")
+                    dlg.dismiss()
                     refreshStep8List()
-                }
-                .setNegativeButton("Cancel", null)
-                .setNeutralButton("Clear") { _, _ ->
+                },
+                negativeText = "Cancel",
+                onNegative = { it.dismiss() },
+                neutralText = "Clear",
+                onNeutral = { dlg ->
                     Prefs.setLimitMinutes(this, pkg, 0)
                     toast("Limit cleared")
+                    dlg.dismiss()
                     refreshStep8List()
-                }
-                .create(),
+                },
+                maxWidthDp = 380f,
+            ),
         )
     }
 
@@ -1126,16 +1258,18 @@ class PermissionsSetupActivity : Activity() {
         val noLimits = Prefs.getAllLimits(this).isEmpty()
         if (noLocks && noLimits) {
             showManagedDialog(
-                AlertDialog.Builder(this)
-                    .setTitle("No Apps Blocked or Limited")
-                    .setMessage(
-                        "You have not selected any apps to PIN-block or set time limits on. You can add them later from the home screen using your PIN. Do you want to continue anyway?",
-                    )
-                    .setPositiveButton("Continue Anyway") { _, _ ->
+                AeroGlassUi.createGlassDialog(
+                    context = this,
+                    title = "No Apps Blocked or Limited",
+                    message = "You have not selected any apps to PIN-block or set time limits on. You can add them later from the home screen using your PIN. Do you want to continue anyway?",
+                    positiveText = "Continue",
+                    onPositive = { dlg ->
+                        dlg.dismiss()
                         finishFirstSetup()
-                    }
-                    .setNegativeButton("Go Back", null)
-                    .create(),
+                    },
+                    negativeText = "Go Back",
+                    onNegative = { it.dismiss() },
+                ),
             )
             return
         }
@@ -1185,18 +1319,22 @@ class PermissionsSetupActivity : Activity() {
             "4. Return to Take a Break and tap Enable Accessibility Service again (the shortcut option is not needed)."
         }
         showManagedDialog(
-            AlertDialog.Builder(this)
-                .setTitle("Allow Restricted Settings")
-                .setMessage(
-                    "On Android 13+ and GrapheneOS, Android hides \"Allow restricted settings\" if App Info is opened directly. You must open it from Settings → Apps → All apps:\n\n" +
-                        "1. Tap Open Apps Settings below (or go to Settings → Apps → See all apps) and select Take a Break.\n\n" +
-                        "2. Tap the ⋮ menu in the top-right corner (or scroll down on Android 15+ / GrapheneOS).\n\n" +
-                        "3. Tap Allow restricted settings.\n\n" +
-                        nextStepText,
-                )
-                .setPositiveButton("Open Apps Settings") { _, _ -> openAppsSettings() }
-                .setNegativeButton("Close", null)
-                .create(),
+            AeroGlassUi.createGlassDialog(
+                context = this,
+                title = "Allow Restricted Settings",
+                message = "On Android 13+ and GrapheneOS, Android hides \"Allow restricted settings\" if App Info is opened directly. You must open it from Settings → Apps → All apps:\n\n" +
+                    "1. Tap Open Apps Settings below (or go to Settings → Apps → See all apps) and select Take a Break.\n\n" +
+                    "2. Tap the ⋮ menu in the top-right corner (or scroll down on Android 15+ / GrapheneOS).\n\n" +
+                    "3. Tap Allow restricted settings.\n\n" +
+                    nextStepText,
+                positiveText = "Open Apps Settings",
+                onPositive = { dlg ->
+                    dlg.dismiss()
+                    openAppsSettings()
+                },
+                negativeText = "Close",
+                onNegative = { it.dismiss() },
+            ),
         )
     }
 
@@ -1222,52 +1360,36 @@ class PermissionsSetupActivity : Activity() {
 
     private fun baseColumn(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        setPadding(40, 32, 40, 40)
     }
 
     private fun setScrollContent(column: LinearLayout) {
-        val scroll = ScrollView(this).apply {
-            isFillViewport = true
-            addView(column)
+        setContentView(AeroGlassUi.wrapScrollableScreen(this, column))
+    }
+
+    private fun headingView(text: String): TextView = AeroGlassUi.createTitle(this, text)
+
+    private fun infoCard(text: String): LinearLayout {
+        val dp = { value: Float -> AeroGlassUi.dp(this, value) }
+        return AeroGlassUi.createGlassCard(this, cornerDp = 22f).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                bottomMargin = dp(12f)
+            }
+            addView(
+                AeroGlassUi.createBodyText(this@PermissionsSetupActivity, text).apply {
+                    setPadding(0, 0, 0, 0)
+                },
+            )
         }
-        setContentView(scroll)
     }
 
-    private fun headingView(text: String): TextView = TextView(this).apply {
-        this.text = text
-        textSize = 22f
-        setPadding(0, 8, 0, 12)
-    }
-
-    private fun subheadingView(text: String): TextView = TextView(this).apply {
-        this.text = text
-        textSize = 15f
-        setPadding(0, 0, 0, 10)
-    }
-
-    private fun bodyView(text: String): TextView = TextView(this).apply {
-        this.text = text
-        textSize = 15f
-        setPadding(0, 0, 0, 16)
-    }
-
-    private fun noteView(text: String): TextView = TextView(this).apply {
-        this.text = text
-        textSize = 13f
-        setTextColor(0xFF555555.toInt())
-        setPadding(0, 0, 0, 10)
-    }
-
-    private fun primaryButton(label: String, onClick: () -> Unit): Button = Button(this).apply {
-        text = label
-        layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-        ).apply {
-            topMargin = 16
-        }
-        setOnClickListener { onClick() }
-    }
+    private fun primaryButton(
+        label: String,
+        tone: AeroGlassUi.GlassTone = AeroGlassUi.GlassTone.LIQUID_CLEAR,
+        onClick: () -> Unit,
+    ): Button = AeroGlassUi.createGlassButton(this, label, tone, onClick)
 
     private fun toast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()

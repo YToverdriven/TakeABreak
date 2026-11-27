@@ -106,29 +106,23 @@ class MainActivity : Activity() {
             )
         }
 
-        // 1. Prominent tall Liquid Glass heading at the top
+        // 1. Prominent modern minimalist heading at the top (non-bold, crisp black)
         val title = TextView(this).apply {
             text = getString(R.string.app_name)
-            textSize = 40f
-            typeface = AeroGlassUi.tallFont(weight = 700)
-            letterSpacing = 0.015f
-            setShadowLayer(6f, 0f, 2f, 0x26157DC4)
-            AeroGlassUi.applyGlassTextGradient(
-                this,
-                topColor = 0xFF0A3956.toInt(),
-                midColor = 0xFF145E87.toInt(),
-                bottomColor = 0xFF0C4866.toInt(),
-            )
+            textSize = 36f
+            typeface = AeroGlassUi.minimalistFont(light = true)
+            letterSpacing = 0.025f
+            setTextColor(AeroGlassUi.TEXT_BLACK)
             gravity = Gravity.CENTER
-            setPadding(0, dp(6f), 0, dp(4f))
+            setPadding(0, dp(6f), 0, dp(6f))
         }
 
-        // 2. Wider double-casement sunlit window graphic centered directly beneath the title on white
+        // 2. Seamless open-window graphic with animated blue-area shine centered beneath the title
         val windowGraphic = TakeABreakWindowView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(286f), dp(208f)).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(266f), dp(204f)).apply {
                 gravity = Gravity.CENTER_HORIZONTAL
-                topMargin = dp(2f)
-                bottomMargin = dp(10f)
+                topMargin = dp(4f)
+                bottomMargin = dp(12f)
             }
         }
 
@@ -145,9 +139,9 @@ class MainActivity : Activity() {
         }
 
         lockedCountView = TextView(this).apply {
-            textSize = 25f
-            typeface = AeroGlassUi.tallFont(weight = 700)
-            setTextColor(0xFF146DA8.toInt())
+            textSize = 26f
+            typeface = AeroGlassUi.minimalistFont(light = true)
+            setTextColor(AeroGlassUi.TEXT_BLACK)
             gravity = Gravity.CENTER
         }
         val lockedCol = buildStatColumn(lockedCountView, "PIN-Locked Apps")
@@ -161,9 +155,9 @@ class MainActivity : Activity() {
         }
 
         limitsCountView = TextView(this).apply {
-            textSize = 25f
-            typeface = AeroGlassUi.tallFont(weight = 700)
-            setTextColor(0xFF18824A.toInt())
+            textSize = 26f
+            typeface = AeroGlassUi.minimalistFont(light = true)
+            setTextColor(AeroGlassUi.TEXT_BLACK)
             gravity = Gravity.CENTER
         }
         val limitsCol = buildStatColumn(limitsCountView, "Usage Limits")
@@ -196,27 +190,14 @@ class MainActivity : Activity() {
             }
         }
 
+        // Pages that don't require PIN to view
         buttonColumn.addView(
             AeroGlassUi.createGlassButton(
                 this,
-                "Select Apps to Lock (PIN)",
-                AeroGlassUi.GlassTone.LIQUID_CLEAR,
-            ) {
-                requirePinThen {
-                    startActivity(Intent(this@MainActivity, AppSelectorActivity::class.java))
-                }
-            },
-        )
-
-        buttonColumn.addView(
-            AeroGlassUi.createGlassButton(
-                this,
-                "App Usage Limits",
-                AeroGlassUi.GlassTone.LIQUID_CLEAR,
-            ) {
-                requirePinThen {
-                    startActivity(Intent(this@MainActivity, UsageLimitsActivity::class.java))
-                }
+                "Set Focus Mode (Coming Soon)",
+                AeroGlassUi.GlassTone.LIQUID_FROST,
+            ) {}.apply {
+                isEnabled = false
             },
         )
 
@@ -233,7 +214,51 @@ class MainActivity : Activity() {
         buttonColumn.addView(
             AeroGlassUi.createGlassButton(
                 this,
-                "Text Message Alerts",
+                "White Noise (Coming Soon)",
+                AeroGlassUi.GlassTone.LIQUID_FROST,
+            ) {}.apply {
+                isEnabled = false
+            },
+        )
+
+        // Thin divider separating open pages from PIN-protected & settings controls
+        buttonColumn.addView(
+            AeroGlassUi.createDivider(this, verticalMarginDp = 10f).apply {
+                (layoutParams as LinearLayout.LayoutParams).apply {
+                    marginStart = dp(12f)
+                    marginEnd = dp(12f)
+                }
+            },
+        )
+
+        buttonColumn.addView(
+            AeroGlassUi.createGlassButton(
+                this,
+                "App Usage Limits (PIN)",
+                AeroGlassUi.GlassTone.LIQUID_CLEAR,
+            ) {
+                requirePinThen {
+                    startActivity(Intent(this@MainActivity, UsageLimitsActivity::class.java))
+                }
+            },
+        )
+
+        buttonColumn.addView(
+            AeroGlassUi.createGlassButton(
+                this,
+                "Select Apps to Lock (PIN)",
+                AeroGlassUi.GlassTone.LIQUID_CLEAR,
+            ) {
+                requirePinThen {
+                    startActivity(Intent(this@MainActivity, AppSelectorActivity::class.java))
+                }
+            },
+        )
+
+        buttonColumn.addView(
+            AeroGlassUi.createGlassButton(
+                this,
+                "Text Message Alerts (PIN)",
                 AeroGlassUi.GlassTone.LIQUID_CLEAR,
             ) {
                 requirePinThen {
@@ -281,13 +306,13 @@ class MainActivity : Activity() {
             )
         }
 
-        // 6. Small tall modern version footer at the bottom
+        // 6. Small modern minimalist version footer at the bottom
         val versionFooter = TextView(this).apply {
             text = getString(R.string.main_version_footer, appVersion())
-            textSize = 12.5f
-            typeface = AeroGlassUi.tallFont(weight = 400)
+            textSize = 12f
+            typeface = AeroGlassUi.minimalistFont(light = true)
             letterSpacing = 0.03f
-            setTextColor(0xFF5D786E.toInt())
+            setTextColor(AeroGlassUi.TEXT_BLACK)
             gravity = Gravity.CENTER
             setPadding(0, dp(20f), 0, dp(4f))
         }
@@ -332,10 +357,10 @@ class MainActivity : Activity() {
             addView(
                 TextView(this@MainActivity).apply {
                     text = caption
-                    textSize = 13.5f
-                    typeface = AeroGlassUi.tallFont(weight = 500)
+                    textSize = 13f
+                    typeface = AeroGlassUi.minimalistFont(light = false)
                     letterSpacing = 0.015f
-                    setTextColor(0xFF45667B.toInt())
+                    setTextColor(AeroGlassUi.TEXT_BLACK)
                     gravity = Gravity.CENTER
                 },
             )
@@ -386,8 +411,8 @@ class MainActivity : Activity() {
 
     private fun appVersion(): String = try {
         @Suppress("DEPRECATION")
-        packageManager.getPackageInfo(packageName, 0).versionName ?: "0.13.0"
+        packageManager.getPackageInfo(packageName, 0).versionName ?: "1.0"
     } catch (_: Exception) {
-        "0.13.0"
+        "1.0"
     }
 }

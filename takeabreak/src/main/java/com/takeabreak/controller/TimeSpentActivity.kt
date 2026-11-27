@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Color
 import android.os.Bundle
+import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -49,21 +50,19 @@ class TimeSpentActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val dp = { value: Float -> AeroGlassUi.dp(this, value) }
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(24, 24, 24, 24)
         }
 
-        val title = TextView(this).apply {
-            text = getString(R.string.time_spent_title)
-            textSize = 20f
-            setPadding(0, 0, 0, 8)
-        }
-
-        val subtitle = TextView(this).apply {
-            text = "Today only. Resets at midnight. Shows minutes and seconds of foreground time. Time on the block screen is not counted."
-            textSize = 13f
-            setPadding(0, 0, 0, 16)
+        val title = AeroGlassUi.createTitle(this, getString(R.string.time_spent_title))
+        val subtitle = AeroGlassUi.createGlassNotice(
+            this,
+            "Today only. Resets at midnight. Shows minutes and seconds of foreground time. Time on the block screen is not counted.",
+            isWarning = false,
+        ).apply {
+            gravity = Gravity.START
         }
 
         container = LinearLayout(this).apply {
@@ -71,24 +70,28 @@ class TimeSpentActivity : Activity() {
         }
 
         val scroll = ScrollView(this).apply {
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
             addView(container)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0,
-                1f
-            )
+                1f,
+            ).apply {
+                topMargin = dp(8f)
+            }
         }
 
         root.addView(menuBackButton())
         root.addView(title)
         root.addView(subtitle)
         root.addView(scroll)
-        setContentView(root)
 
+        setContentView(AeroGlassUi.wrapFixedScreen(this, root))
         loadUsage()
     }
 
     private fun loadUsage() {
+        val dp = { value: Float -> AeroGlassUi.dp(this, value) }
         container.removeAllViews()
         val usageMap = Prefs.getAllUsageMs(this)
         val pm = packageManager
@@ -109,73 +112,113 @@ class TimeSpentActivity : Activity() {
             .toList()
 
         if (entries.isEmpty()) {
-            val empty = TextView(this).apply {
-                text = getString(R.string.time_spent_empty)
-                textSize = 16f
-                setPadding(0, 32, 0, 0)
+            val emptyCard = AeroGlassUi.createGlassCard(this, cornerDp = 22f).apply {
+                setPadding(dp(20f), dp(24f), dp(20f), dp(24f))
+                addView(
+                    AeroGlassUi.createBodyText(
+                        this@TimeSpentActivity,
+                        getString(R.string.time_spent_empty),
+                        centered = true,
+                        secondary = true,
+                    ).apply {
+                        setPadding(0, 0, 0, 0)
+                    },
+                )
             }
-            container.addView(empty)
+            container.addView(emptyCard)
             return
+        }
+
+        val listCard = AeroGlassUi.createGlassCard(this, cornerDp = 22f).apply {
+            setPadding(dp(16f), dp(12f), dp(16f), dp(14f))
         }
 
         val maxMs = entries.maxOfOrNull { it.second } ?: 1L
 
-        for ((label, ms, minutes) in entries) {
+        entries.forEachIndexed { index, (label, ms, minutes) ->
+            if (index > 0) {
+                listCard.addView(AeroGlassUi.createDivider(this, verticalMarginDp = 6f))
+            }
+
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                setPadding(0, 8, 0, 8)
+                setPadding(dp(2f), dp(4f), dp(2f), dp(4f))
             }
 
-            val header = TextView(this).apply {
-                text = "$label — ${UsageText.format(ms)}"
-                textSize = 15f
-            }
-
-            val barContainer = LinearLayout(this).apply {
+            val headerRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, 0, 0, dp(6f))
+            }
+
+            val nameTv = TextView(this).apply {
+                text = label
+                textSize = 15f
+                typeface = AeroGlassUi.minimalistFont(light = false)
+                setTextColor(AeroGlassUi.TEXT_BLACK)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+
+            val durationTv = TextView(this).apply {
+                text = UsageText.format(ms)
+                textSize = 14f
+                typeface = AeroGlassUi.minimalistFont(light = false)
+                setTextColor(AeroGlassUi.TEXT_SECONDARY)
+            }
+
+            headerRow.addView(nameTv)
+            headerRow.addView(durationTv)
+
+            val barTrack = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                background = AeroGlassUi.createGlassBarTrackDrawable(this@TimeSpentActivity)
+                setPadding(dp(3f), dp(3f), dp(3f), dp(4f))
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    36,
+                    dp(20f),
                 )
-                setPadding(0, 4, 0, 0)
             }
 
-            val fraction = ms.toFloat() / maxMs.coerceAtLeast(1L).toFloat()
+            val fraction = (ms.toFloat() / maxMs.coerceAtLeast(1L).toFloat()).coerceIn(0.04f, 1f)
             val bar = View(this).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     0,
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     fraction,
                 )
-                setBackgroundColor(colorForMinutes(minutes))
+                background = AeroGlassUi.createGlassBarFillDrawable(
+                    this@TimeSpentActivity,
+                    colorForMinutes(minutes),
+                )
             }
 
-            // spacer so the bar doesn't stretch full width always
             val spacer = View(this).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     0,
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    1f - fraction,
+                    (1f - fraction).coerceAtLeast(0f),
                 )
             }
 
-            barContainer.addView(bar)
-            barContainer.addView(spacer)
+            barTrack.addView(bar)
+            barTrack.addView(spacer)
 
-            row.addView(header)
-            row.addView(barContainer)
-            container.addView(row)
+            row.addView(headerRow)
+            row.addView(barTrack)
+            listCard.addView(row)
         }
+
+        container.addView(listCard)
     }
 
     private fun colorForMinutes(minutes: Int): Int {
         val hours = minutes / 60.0
         return when {
-            hours < 1.0 -> Color.rgb(255, 180, 180)
-            hours < 2.0 -> Color.rgb(255, 120, 120)
-            hours < 3.0 -> Color.rgb(230, 70, 70)
-            hours < 4.0 -> Color.rgb(200, 40, 50)
-            else -> Color.rgb(220, 20, 60)
+            hours < 1.0 -> Color.rgb(112, 188, 226)
+            hours < 2.0 -> Color.rgb(245, 168, 122)
+            hours < 3.0 -> Color.rgb(236, 118, 112)
+            hours < 4.0 -> Color.rgb(214, 72, 78)
+            else -> Color.rgb(198, 40, 62)
         }
     }
 }

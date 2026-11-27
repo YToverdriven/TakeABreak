@@ -2,16 +2,15 @@ package com.takeabreak.watcher
 
 import android.Manifest
 import android.app.Activity
-import android.app.AlertDialog
 import android.app.Dialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
+import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -140,12 +139,12 @@ class PermissionsSetupActivity : Activity() {
         }
         column.addView(headingView("Set Up Text Message Alerts"))
         column.addView(
-            bodyView(
+            infoCard(
                 "Grant SMS permission so Take a Break Watcher can alert by text message if Take a Break is ever disabled or deleted.",
             ),
         )
         column.addView(
-            primaryButton("Grant SMS Permission") {
+            primaryButton("Grant SMS Permission", AeroGlassUi.GlassTone.LIQUID_SKY) {
                 showSmsExplanationDialog()
             },
         )
@@ -154,16 +153,17 @@ class PermissionsSetupActivity : Activity() {
 
     private fun showSmsExplanationDialog() {
         showManagedDialog(
-            AlertDialog.Builder(this)
-                .setTitle("Grant SMS Permission")
-                .setMessage(
-                    "The option to grant SMS permissions may not be allowed if the app was downloaded from an unofficial source. Please try tapping the permission anyway. Dismiss any pop-up concerning restricted settings. You will then be able to enable restricted settings if required by your Android version.",
-                )
-                .setPositiveButton("I Understand") { _, _ ->
+            AeroGlassUi.createGlassDialog(
+                context = this,
+                title = "Grant SMS Permission",
+                message = "The option to grant SMS permissions may not be allowed if the app was downloaded from an unofficial source. Please try tapping the permission anyway. Dismiss any pop-up concerning restricted settings. You will then be able to enable restricted settings if required by your Android version.",
+                positiveText = "I Understand",
+                onPositive = { dlg ->
+                    dlg.dismiss()
                     requestPermissions(arrayOf(Manifest.permission.SEND_SMS), SMS_REQUEST)
-                }
-                .setCancelable(true)
-                .create(),
+                },
+                cancelable = true,
+            ),
         )
     }
 
@@ -176,18 +176,18 @@ class PermissionsSetupActivity : Activity() {
         }
         column.addView(headingView("Continuing Permissions Setup"))
         column.addView(
-            bodyView(
+            infoCard(
                 "You are viewing this screen because SMS permission was not enabled. If SMS permission was blocked, enable restricted settings first, then try granting SMS permission again.",
             ),
         )
 
-        val restrictedBtn = primaryButton("Restricted Settings") {
+        val restrictedBtn = primaryButton("Restricted Settings", AeroGlassUi.GlassTone.LIQUID_FROST) {
             showRestrictedSettingsDialog()
         }
         val smsBtn = primaryButton("Grant SMS Permission") {
             requestPermissions(arrayOf(Manifest.permission.SEND_SMS), SMS_REQUEST)
         }
-        val nextBtn = primaryButton("Next") {
+        val nextBtn = primaryButton("Next", AeroGlassUi.GlassTone.LIQUID_SKY) {
             goToStep(STEP_COMPLETE)
         }
 
@@ -213,21 +213,34 @@ class PermissionsSetupActivity : Activity() {
     // ---- Screen 3B: Setup Complete ----
 
     private fun renderStep3BComplete() {
-        val column = baseColumn()
-        column.addView(headingView("Watcher is Set Up."))
+        val dp = { value: Float -> AeroGlassUi.dp(this, value) }
+        val column = baseColumn().apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+        column.addView(AeroGlassUi.createTitle(this, "Watcher is Set Up.", sizeSp = 30f, centered = true))
         column.addView(
-            bodyView(
+            TakeABreakWindowView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(208f), dp(160f)).apply {
+                    gravity = Gravity.CENTER_HORIZONTAL
+                    topMargin = dp(4f)
+                    bottomMargin = dp(12f)
+                }
+            },
+        )
+        column.addView(
+            infoCard(
                 "Take a Break Watcher has SMS permission and is ready to monitor Take a Break.",
+                centered = true,
             ),
         )
         column.addView(
-            primaryButton("Return to Take a Break") {
+            primaryButton("Return to Take a Break", AeroGlassUi.GlassTone.LIQUID_SKY) {
                 returnToTakeABreak()
             },
         )
         if (!isFirstSetup) {
             column.addView(
-                primaryButton("Back to Watcher") {
+                primaryButton("Back to Watcher", AeroGlassUi.GlassTone.LIQUID_FROST) {
                     finish()
                 },
             )
@@ -272,18 +285,22 @@ class PermissionsSetupActivity : Activity() {
 
     private fun showRestrictedSettingsDialog() {
         showManagedDialog(
-            AlertDialog.Builder(this)
-                .setTitle("Allow Restricted Settings")
-                .setMessage(
-                    "On Android 13+ and GrapheneOS, Android hides \"Allow restricted settings\" if App Info is opened directly. You must open it from Settings → Apps → All apps:\n\n" +
-                        "1. Tap Open Apps Settings below (or go to Settings → Apps → See all apps) and select Take a Break Watcher.\n\n" +
-                        "2. Tap the ⋮ menu in the top-right corner (or scroll down on Android 15+ / GrapheneOS).\n\n" +
-                        "3. Tap Allow restricted settings.\n\n" +
-                        "4. Return here and tap Grant SMS Permission again (or enable SMS under Permissions → SMS).",
-                )
-                .setPositiveButton("Open Apps Settings") { _, _ -> openAppsSettings() }
-                .setNegativeButton("Close", null)
-                .create(),
+            AeroGlassUi.createGlassDialog(
+                context = this,
+                title = "Allow Restricted Settings",
+                message = "On Android 13+ and GrapheneOS, Android hides \"Allow restricted settings\" if App Info is opened directly. You must open it from Settings → Apps → All apps:\n\n" +
+                    "1. Tap Open Apps Settings below (or go to Settings → Apps → See all apps) and select Take a Break Watcher.\n\n" +
+                    "2. Tap the ⋮ menu in the top-right corner (or scroll down on Android 15+ / GrapheneOS).\n\n" +
+                    "3. Tap Allow restricted settings.\n\n" +
+                    "4. Return here and tap Grant SMS Permission again (or enable SMS under Permissions → SMS).",
+                positiveText = "Open Apps Settings",
+                onPositive = { dlg ->
+                    dlg.dismiss()
+                    openAppsSettings()
+                },
+                negativeText = "Close",
+                onNegative = { it.dismiss() },
+            ),
         )
     }
 
@@ -307,50 +324,45 @@ class PermissionsSetupActivity : Activity() {
         }
     }
 
-    private fun backToWatcherButton(): Button = Button(this).apply {
-        text = "Back"
-        layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-        )
-        setOnClickListener { finish() }
-    }
+    private fun backToWatcherButton(): Button =
+        AeroGlassUi.createTopBarBackButton(this, "Back") { finish() }
 
     private fun baseColumn(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        setPadding(40, 32, 40, 40)
     }
 
     private fun setScrollContent(column: LinearLayout) {
-        val scroll = ScrollView(this).apply {
-            isFillViewport = true
-            addView(column)
+        setContentView(AeroGlassUi.wrapScrollableScreen(this, column))
+    }
+
+    private fun headingView(text: String): TextView = AeroGlassUi.createTitle(this, text)
+
+    private fun infoCard(text: String, centered: Boolean = false): LinearLayout {
+        val dp = { value: Float -> AeroGlassUi.dp(this, value) }
+        return AeroGlassUi.createGlassCard(this, cornerDp = 22f).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                bottomMargin = dp(12f)
+            }
+            addView(
+                AeroGlassUi.createBodyText(
+                    this@PermissionsSetupActivity,
+                    text,
+                    centered = centered,
+                ).apply {
+                    setPadding(0, 0, 0, 0)
+                },
+            )
         }
-        setContentView(scroll)
     }
 
-    private fun headingView(text: String): TextView = TextView(this).apply {
-        this.text = text
-        textSize = 22f
-        setPadding(0, 8, 0, 12)
-    }
-
-    private fun bodyView(text: String): TextView = TextView(this).apply {
-        this.text = text
-        textSize = 15f
-        setPadding(0, 0, 0, 16)
-    }
-
-    private fun primaryButton(label: String, onClick: () -> Unit): Button = Button(this).apply {
-        text = label
-        layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-        ).apply {
-            topMargin = 16
-        }
-        setOnClickListener { onClick() }
-    }
+    private fun primaryButton(
+        label: String,
+        tone: AeroGlassUi.GlassTone = AeroGlassUi.GlassTone.LIQUID_CLEAR,
+        onClick: () -> Unit,
+    ): Button = AeroGlassUi.createGlassButton(this, label, tone, onClick)
 
     private fun toast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()

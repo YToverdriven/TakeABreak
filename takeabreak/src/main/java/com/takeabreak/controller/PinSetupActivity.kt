@@ -2,13 +2,10 @@ package com.takeabreak.controller
 
 import android.os.Bundle
 import android.text.InputType
-import android.view.Gravity
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
-import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.Toast
 
 class PinSetupActivity : PinLockedActivity() {
@@ -33,93 +30,129 @@ class PinSetupActivity : PinLockedActivity() {
     }
 
     private fun showOldPinGate() {
-        val layout = LinearLayout(this).apply {
+        val dp = { value: Float -> AeroGlassUi.dp(this, value) }
+
+        val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(48, 48, 48, 48)
-            gravity = Gravity.CENTER
         }
 
-        val title = TextView(this).apply {
-            text = getString(R.string.enter_current_pin)
-            textSize = 20f
-            setPadding(0, 0, 0, 32)
-        }
+        val title = AeroGlassUi.createTitle(this, getString(R.string.enter_current_pin))
+        val subtitle = AeroGlassUi.createBodyText(
+            this,
+            "Confirm your existing PIN before choosing a new one.",
+            secondary = true,
+        )
 
-        val pinInput = EditText(this).apply {
-            hint = "Current PIN"
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
-        }
-
-        val nextBtn = Button(this).apply {
-            text = "Continue"
-            setOnClickListener {
-                val pin = pinInput.text.toString()
-                if (Prefs.checkPin(this@PinSetupActivity, pin)) {
-                    showNewPinForm()
-                } else {
-                    Toast.makeText(this@PinSetupActivity, "Wrong PIN", Toast.LENGTH_SHORT).show()
-                    pinInput.text.clear()
-                    focusPin(pinInput)
-                }
+        val card = AeroGlassUi.createGlassCard(this, cornerDp = 24f).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(6f)
             }
         }
 
-        layout.addView(menuBackButton())
-        layout.addView(title)
-        layout.addView(pinInput)
-        layout.addView(nextBtn)
-        setContentView(layout)
+        val pinInput = AeroGlassUi.createGlassInput(
+            this,
+            "Current PIN",
+            InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD,
+        )
+
+        val nextBtn = AeroGlassUi.createGlassButton(
+            this,
+            "Continue",
+            AeroGlassUi.GlassTone.LIQUID_SKY,
+        ) {
+            val pin = pinInput.text.toString()
+            if (Prefs.checkPin(this@PinSetupActivity, pin)) {
+                showNewPinForm()
+            } else {
+                Toast.makeText(this@PinSetupActivity, "Wrong PIN", Toast.LENGTH_SHORT).show()
+                pinInput.text.clear()
+                focusPin(pinInput)
+            }
+        }
+
+        card.addView(pinInput)
+        card.addView(nextBtn)
+
+        column.addView(menuBackButton())
+        column.addView(title)
+        column.addView(subtitle)
+        column.addView(card)
+
+        setContentView(AeroGlassUi.wrapScrollableScreen(this, column))
         focusPin(pinInput)
     }
 
     private fun showNewPinForm() {
-        val layout = LinearLayout(this).apply {
+        val dp = { value: Float -> AeroGlassUi.dp(this, value) }
+
+        val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(48, 48, 48, 48)
-            gravity = Gravity.CENTER_HORIZONTAL
         }
 
-        val title = TextView(this).apply {
-            text = if (Prefs.isPinSet(this@PinSetupActivity)) "Change PIN" else "Set up PIN"
-            textSize = 20f
-            setPadding(0, 0, 0, 32)
-        }
+        val title = AeroGlassUi.createTitle(
+            this,
+            if (Prefs.isPinSet(this)) "Change PIN" else "Set up PIN",
+        )
+        val subtitle = AeroGlassUi.createBodyText(
+            this,
+            "Choose a PIN with at least 4 digits.",
+            secondary = true,
+        )
 
-        val pinInput = EditText(this).apply {
-            hint = "Enter new PIN (4+ digits)"
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
-        }
-
-        val confirmInput = EditText(this).apply {
-            hint = "Confirm new PIN"
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
-        }
-
-        val saveBtn = Button(this).apply {
-            text = "Save PIN"
-            setOnClickListener {
-                val pin = pinInput.text.toString()
-                val confirm = confirmInput.text.toString()
-                if (pin.length < 4) {
-                    Toast.makeText(this@PinSetupActivity, "PIN must be at least 4 digits", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-                if (pin != confirm) {
-                    Toast.makeText(this@PinSetupActivity, "PINs do not match", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-                Prefs.setPin(this@PinSetupActivity, pin)
-                Toast.makeText(this@PinSetupActivity, "PIN saved", Toast.LENGTH_SHORT).show()
-                finish()
+        val card = AeroGlassUi.createGlassCard(this, cornerDp = 24f).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(6f)
             }
         }
 
-        layout.addView(menuBackButton())
-        layout.addView(title)
-        layout.addView(pinInput)
-        layout.addView(confirmInput)
-        layout.addView(saveBtn)
-        setContentView(layout)
+        val pinInput = AeroGlassUi.createGlassInput(
+            this,
+            "Enter new PIN (4+ digits)",
+            InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD,
+        )
+
+        val confirmInput = AeroGlassUi.createGlassInput(
+            this,
+            "Confirm new PIN",
+            InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD,
+        )
+
+        val saveBtn = AeroGlassUi.createGlassButton(
+            this,
+            "Save PIN",
+            AeroGlassUi.GlassTone.LIQUID_SKY,
+        ) {
+            val pin = pinInput.text.toString()
+            val confirm = confirmInput.text.toString()
+            if (pin.length < 4) {
+                Toast.makeText(this@PinSetupActivity, "PIN must be at least 4 digits", Toast.LENGTH_SHORT).show()
+                return@createGlassButton
+            }
+            if (pin != confirm) {
+                Toast.makeText(this@PinSetupActivity, "PINs do not match", Toast.LENGTH_SHORT).show()
+                return@createGlassButton
+            }
+            Prefs.setPin(this@PinSetupActivity, pin)
+            Toast.makeText(this@PinSetupActivity, "PIN saved", Toast.LENGTH_SHORT).show()
+            finish()
+        }
+
+        card.addView(pinInput)
+        card.addView(confirmInput)
+        card.addView(saveBtn)
+
+        column.addView(menuBackButton())
+        column.addView(title)
+        column.addView(subtitle)
+        column.addView(card)
+
+        setContentView(AeroGlassUi.wrapScrollableScreen(this, column))
         focusPin(pinInput)
     }
 

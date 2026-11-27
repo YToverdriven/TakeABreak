@@ -1,6 +1,5 @@
 package com.takeabreak.controller
 
-import android.app.AlertDialog
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -10,7 +9,6 @@ import android.util.Log
 import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -50,34 +48,39 @@ class DebugActivity : PinLockedActivity() {
         super.onCreate(savedInstanceState)
         if (isLockedOut) return
 
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(24, 24, 24, 24)
-        }
+        val dp = { value: Float -> AeroGlassUi.dp(this, value) }
 
-        val title = TextView(this).apply {
-            text = getString(R.string.debug_title)
-            textSize = 22f
-            setPadding(0, 0, 0, 8)
-        }
+        val title = AeroGlassUi.createTitle(this, getString(R.string.debug_title))
+        val intro = AeroGlassUi.createBodyText(
+            this,
+            "For testing. These do not change the PIN.",
+            secondary = true,
+        )
 
-        val intro = TextView(this).apply {
-            text = "For testing. These do not change the PIN."
-            textSize = 14f
-            setPadding(0, 0, 0, 16)
+        val statusCard = AeroGlassUi.createGlassCard(this, cornerDp = 22f).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                bottomMargin = dp(12f)
+            }
         }
 
         statusView = TextView(this).apply {
-            textSize = 14f
-            setPadding(0, 0, 0, 16)
+            textSize = 13.5f
+            typeface = AeroGlassUi.minimalistFont(light = false)
+            setLineSpacing(AeroGlassUi.dpF(this@DebugActivity, 2.5f), 1f)
+            setTextColor(AeroGlassUi.TEXT_BLACK)
+            gravity = Gravity.START
         }
+        statusCard.addView(statusView)
 
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(menuBackButton())
             addView(title)
             addView(intro)
-            addView(statusView)
+            addView(statusCard)
             addView(
                 action("Clear all time spent today") {
                     confirm(
@@ -90,62 +93,77 @@ class DebugActivity : PinLockedActivity() {
                     }
                 },
             )
-            addView(action("Reset all apps to no limit") {
-                confirm(
-                    "Clear every limit?",
-                    "Every daily limit is removed. Time spent and PIN locks stay."
-                ) {
-                    Prefs.clearAllLimits(this@DebugActivity)
-                    toast("Limits cleared")
-                }
-            })
-            addView(action("Clear PIN-locked apps") {
-                confirm(
-                    "Clear PIN locks?",
-                    "No app will ask for a PIN until you select apps again. The PIN itself stays."
-                ) {
-                    Prefs.clearLockedPackages(this@DebugActivity)
-                    toast("PIN locks cleared")
-                }
-            })
-            addView(action("Clear today's unlocks and extensions") {
-                confirm(
-                    "Clear unlocks and extensions?",
-                    "Day-unlocks and the one-time 5-minute extensions are removed, so limits apply again today."
-                ) {
-                    Prefs.clearTodayOverrides(this@DebugActivity)
-                    toast("Unlocks and extensions cleared")
-                }
-            })
-            addView(action("Add 2 minutes to each limited app") {
-                confirm(
-                    "Add usage?",
-                    "Each app that has a limit gets 2 more minutes of today's usage, so the time-up screen can be tested."
-                ) {
-                    val count = Prefs.getAllLimits(this@DebugActivity).size
-                    Prefs.addUsageToLimitedApps(this@DebugActivity, 2 * 60_000L)
-                    toast(if (count == 0) "No apps have a limit" else "Added 2 minutes to $count apps")
-                }
-            })
-            addView(action("Clear queued SMS") {
-                confirm(
-                    "Clear SMS retry queue?",
-                    "Any pending SMS alerts waiting to retry will be removed."
-                ) {
-                    SmsAlerts.clearQueue(this@DebugActivity)
-                    toast("Queued SMS cleared")
-                }
-            })
-            addView(action("Write status to logcat") {
-                val text = statusText()
-                Log.d("TakeABreak", "debug status\n$text")
-                toast("Wrote status to logcat, tag TakeABreak")
-            })
-            addView(action("Refresh status") { refreshStatus() })
+            addView(
+                action("Reset all apps to no limit") {
+                    confirm(
+                        "Clear every limit?",
+                        "Every daily limit is removed. Time spent and PIN locks stay.",
+                    ) {
+                        Prefs.clearAllLimits(this@DebugActivity)
+                        toast("Limits cleared")
+                    }
+                },
+            )
+            addView(
+                action("Clear PIN-locked apps") {
+                    confirm(
+                        "Clear PIN locks?",
+                        "No app will ask for a PIN until you select apps again. The PIN itself stays.",
+                    ) {
+                        Prefs.clearLockedPackages(this@DebugActivity)
+                        toast("PIN locks cleared")
+                    }
+                },
+            )
+            addView(
+                action("Clear today's unlocks and extensions") {
+                    confirm(
+                        "Clear unlocks and extensions?",
+                        "Day-unlocks and the one-time 5-minute extensions are removed, so limits apply again today.",
+                    ) {
+                        Prefs.clearTodayOverrides(this@DebugActivity)
+                        toast("Unlocks and extensions cleared")
+                    }
+                },
+            )
+            addView(
+                action("Add 2 minutes to each limited app") {
+                    confirm(
+                        "Add usage?",
+                        "Each app that has a limit gets 2 more minutes of today's usage, so the time-up screen can be tested.",
+                    ) {
+                        val count = Prefs.getAllLimits(this@DebugActivity).size
+                        Prefs.addUsageToLimitedApps(this@DebugActivity, 2 * 60_000L)
+                        toast(if (count == 0) "No apps have a limit" else "Added 2 minutes to $count apps")
+                    }
+                },
+            )
+            addView(
+                action("Clear queued SMS") {
+                    confirm(
+                        "Clear SMS retry queue?",
+                        "Any pending SMS alerts waiting to retry will be removed.",
+                    ) {
+                        SmsAlerts.clearQueue(this@DebugActivity)
+                        toast("Queued SMS cleared")
+                    }
+                },
+            )
+            addView(
+                action("Write status to logcat", AeroGlassUi.GlassTone.LIQUID_FROST) {
+                    val text = statusText()
+                    Log.d("TakeABreak", "debug status\n$text")
+                    toast("Wrote status to logcat, tag TakeABreak")
+                },
+            )
+            addView(
+                action("Refresh status", AeroGlassUi.GlassTone.LIQUID_FROST) {
+                    refreshStatus()
+                },
+            )
         }
 
-        root.addView(ScrollView(this).apply { addView(column) })
-        setContentView(root)
+        setContentView(AeroGlassUi.wrapScrollableScreen(this, column))
         refreshStatus()
     }
 
@@ -155,22 +173,27 @@ class DebugActivity : PinLockedActivity() {
         refreshStatus()
     }
 
-    private fun action(label: String, onClick: () -> Unit): Button = Button(this).apply {
-        text = label
-        setOnClickListener { onClick() }
-    }
+    private fun action(
+        label: String,
+        tone: AeroGlassUi.GlassTone = AeroGlassUi.GlassTone.LIQUID_CLEAR,
+        onClick: () -> Unit,
+    ): Button = AeroGlassUi.createGlassButton(this, label, tone, onClick)
 
     private fun confirm(title: String, message: String, onYes: () -> Unit) {
         showManagedDialog(
-            AlertDialog.Builder(this)
-                .setTitle(title)
-                .setMessage(message)
-                .setPositiveButton("Do it") { _, _ ->
+            AeroGlassUi.createGlassDialog(
+                context = this,
+                title = title,
+                message = message,
+                positiveText = "Do it",
+                onPositive = { dlg ->
+                    dlg.dismiss()
                     onYes()
                     refreshStatus()
-                }
-                .setNegativeButton("Cancel", null)
-                .create(),
+                },
+                negativeText = "Cancel",
+                onNegative = { it.dismiss() },
+            ),
         )
     }
 

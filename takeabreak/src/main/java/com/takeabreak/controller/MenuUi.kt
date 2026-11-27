@@ -6,10 +6,8 @@ import android.content.Intent
 import android.provider.Settings
 import android.widget.Button
 
-fun Activity.menuBackButton(label: String = "Back"): Button = Button(this).apply {
-    text = label
-    setOnClickListener { finish() }
-}
+fun Activity.menuBackButton(label: String = "Back"): Button =
+    AeroGlassUi.createTopBarBackButton(this, label) { finish() }
 
 /** Tells the accessibility service this app is in front, so it saves usage before a screen reads it. */
 fun Activity.noteControllerVisible() {
@@ -25,11 +23,11 @@ fun isAccessibilityEnabled(context: Context): Boolean {
     }
     val enabled = Settings.Secure.getString(
         cr,
-        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
     ) ?: return false
     val component = android.content.ComponentName(
         context,
-        AppLockAccessibilityService::class.java
+        AppLockAccessibilityService::class.java,
     )
     val flat = component.flattenToString()
     val shortFlat = component.flattenToShortString()

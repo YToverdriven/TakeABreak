@@ -13,8 +13,8 @@ android {
         applicationId = "com.takeabreak.controller"
         minSdk = 26
         targetSdk = 34
-        versionCode = 130
-        versionName = "0.13.0"
+        versionCode = 1000
+        versionName = "1.0"
     }
 
     val keystorePropsFile = rootProject.file("keystore.properties")

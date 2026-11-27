@@ -1,8 +1,6 @@
 package com.takeabreak.controller
 
 import android.Manifest
-import android.app.AlertDialog
-import android.app.TimePickerDialog
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -15,10 +13,8 @@ import android.text.format.DateFormat
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
-import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -71,151 +67,187 @@ class SmsAlertsActivity : PinLockedActivity() {
         super.onCreate(savedInstanceState)
         if (isLockedOut) return
 
+        val dp = { value: Float -> AeroGlassUi.dp(this, value) }
+
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(32, 24, 32, 32)
         }
 
-        val title = TextView(this).apply {
-            text = getString(R.string.sms_alerts_title)
-            textSize = 22f
-            setPadding(0, 8, 0, 8)
+        val title = AeroGlassUi.createTitle(this, getString(R.string.sms_alerts_title))
+        val intro = AeroGlassUi.createBodyText(
+            this,
+            "Alerts are sent by SMS to the number below. Leave blank to turn off all SMS alerts. If the phone is in airplane mode or has no service, failed alerts wait in a retry queue with backoff and rate limits.",
+            secondary = true,
+        )
+
+        // Card 1: Phone Number & SMS Controls
+        val phoneCard = AeroGlassUi.createGlassCard(this, cornerDp = 22f).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                bottomMargin = dp(12f)
+            }
         }
 
-        val intro = TextView(this).apply {
-            text = "Alerts are sent by SMS to the number below. Leave blank to turn off all SMS alerts. If the phone is in airplane mode or has no service, failed alerts wait in a retry queue with backoff and rate limits."
-            textSize = 14f
-            setPadding(0, 0, 0, 16)
-        }
+        val phoneLabel = AeroGlassUi.createSectionTitle(this, "Alert phone number")
 
-        val phoneLabel = TextView(this).apply {
-            text = "Alert phone number"
-            textSize = 16f
-            setPadding(0, 8, 0, 4)
-        }
-
-        phoneInput = EditText(this).apply {
-            hint = "Phone number (blank = off)"
-            inputType = InputType.TYPE_CLASS_PHONE
+        phoneInput = AeroGlassUi.createGlassInput(
+            this,
+            "Phone number (blank = off)",
+            InputType.TYPE_CLASS_PHONE,
+        ).apply {
             setText(Prefs.getSmsPhoneNumber(this@SmsAlertsActivity))
         }
 
-        val saveNumberBtn = Button(this).apply {
-            text = "Save Phone Number"
-            setOnClickListener { savePhoneNumber() }
+        val saveNumberBtn = AeroGlassUi.createGlassButton(
+            this,
+            "Save Phone Number",
+            AeroGlassUi.GlassTone.LIQUID_SKY,
+        ) {
+            savePhoneNumber()
         }
 
-        permBtn = Button(this).apply {
-            text = "Grant SMS Permission"
-            setOnClickListener {
-                requestPermissions(arrayOf(Manifest.permission.SEND_SMS), SMS_REQUEST)
+        permBtn = AeroGlassUi.createGlassButton(
+            this,
+            "Grant SMS Permission",
+            AeroGlassUi.GlassTone.LIQUID_CLEAR,
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.SEND_SMS), SMS_REQUEST)
+        }
+
+        restrictedBtn = AeroGlassUi.createGlassButton(
+            this,
+            getString(R.string.restricted_settings_help_button),
+            AeroGlassUi.GlassTone.LIQUID_FROST,
+        ) {
+            showSmsRestrictedHelp()
+        }
+
+        testBtn = AeroGlassUi.createGlassButton(
+            this,
+            "Send Test SMS",
+            AeroGlassUi.GlassTone.LIQUID_FROST,
+        ) {
+            sendTestSms()
+        }
+
+        phoneCard.addView(phoneLabel)
+        phoneCard.addView(phoneInput)
+        phoneCard.addView(saveNumberBtn)
+        phoneCard.addView(permBtn)
+        phoneCard.addView(restrictedBtn)
+        phoneCard.addView(testBtn)
+
+        // Card 2: Event Toggles
+        val togglesCard = AeroGlassUi.createGlassCard(this, cornerDp = 22f).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                bottomMargin = dp(12f)
             }
         }
 
-        restrictedBtn = Button(this).apply {
-            text = getString(R.string.restricted_settings_help_button)
-            setOnClickListener { showSmsRestrictedHelp() }
+        val togglesHeader = AeroGlassUi.createSectionTitle(this, "Send an SMS when:")
+
+        val newAppCb = AeroGlassUi.createGlassCheckBox(
+            this,
+            "A new app is installed",
+            Prefs.isAlertNewAppEnabled(this),
+        ) { checked ->
+            Prefs.setAlertNewAppEnabled(this@SmsAlertsActivity, checked)
         }
 
-        testBtn = Button(this).apply {
-            text = "Send Test SMS"
-            setOnClickListener { sendTestSms() }
+        val tamperCb = AeroGlassUi.createGlassCheckBox(
+            this,
+            "Take a Break or Watcher is deleted, disabled, reset, or accessibility is turned off",
+            Prefs.isAlertTamperEnabled(this),
+        ) { checked ->
+            Prefs.setAlertTamperEnabled(this@SmsAlertsActivity, checked)
+            WatcherMessages.syncConfig(this@SmsAlertsActivity)
         }
 
-        val togglesHeader = TextView(this).apply {
-            text = "Send an SMS when:"
-            textSize = 16f
-            setPadding(0, 24, 0, 8)
+        val dayUnlockCb = AeroGlassUi.createGlassCheckBox(
+            this,
+            "PIN is entered to unlock a blocked app",
+            Prefs.isAlertDayUnlockEnabled(this),
+        ) { checked ->
+            Prefs.setAlertDayUnlockEnabled(this@SmsAlertsActivity, checked)
         }
 
-        val newAppCb = CheckBox(this).apply {
-            text = "A new app is installed"
-            isChecked = Prefs.isAlertNewAppEnabled(this@SmsAlertsActivity)
-            setOnCheckedChangeListener { _, checked ->
-                Prefs.setAlertNewAppEnabled(this@SmsAlertsActivity, checked)
-            }
-        }
-
-        val tamperCb = CheckBox(this).apply {
-            text = "Take a Break or Watcher is deleted, disabled, reset, or accessibility is turned off"
-            isChecked = Prefs.isAlertTamperEnabled(this@SmsAlertsActivity)
-            setOnCheckedChangeListener { _, checked ->
-                Prefs.setAlertTamperEnabled(this@SmsAlertsActivity, checked)
-                WatcherMessages.syncConfig(this@SmsAlertsActivity)
-            }
-        }
-
-        val dayUnlockCb = CheckBox(this).apply {
-            text = "PIN is entered to unlock a blocked app"
-            isChecked = Prefs.isAlertDayUnlockEnabled(this@SmsAlertsActivity)
-            setOnCheckedChangeListener { _, checked ->
-                Prefs.setAlertDayUnlockEnabled(this@SmsAlertsActivity, checked)
-            }
-        }
-
-        val dailyStatusCb = CheckBox(this).apply {
-            text = "Once-a-day status check"
-            isChecked = Prefs.isDailyStatusEnabled(this@SmsAlertsActivity)
-            setOnCheckedChangeListener { _, checked ->
-                Prefs.setDailyStatusEnabled(this@SmsAlertsActivity, checked)
-                DailyStatusWorker.syncSchedule(this@SmsAlertsActivity)
-                refreshDailyTimeUi()
-            }
+        val dailyStatusCb = AeroGlassUi.createGlassCheckBox(
+            this,
+            "Once-a-day status check",
+            Prefs.isDailyStatusEnabled(this),
+        ) { checked ->
+            Prefs.setDailyStatusEnabled(this@SmsAlertsActivity, checked)
+            DailyStatusWorker.syncSchedule(this@SmsAlertsActivity)
+            refreshDailyTimeUi()
         }
 
         val timeRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(36, 4, 0, 12)
+            setPadding(dp(28f), dp(6f), 0, dp(4f))
         }
 
         dailyTimeLabel = TextView(this).apply {
-            textSize = 15f
+            textSize = 14.5f
+            typeface = AeroGlassUi.minimalistFont(light = false)
+            setTextColor(AeroGlassUi.TEXT_SECONDARY)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
-        changeTimeBtn = Button(this).apply {
-            text = "Change Time"
-            setOnClickListener { showTimePicker() }
+        changeTimeBtn = AeroGlassUi.createCompactGlassButton(
+            this,
+            "Change Time",
+            AeroGlassUi.GlassTone.LIQUID_CLEAR,
+        ) {
+            showTimePicker()
         }
 
         timeRow.addView(dailyTimeLabel)
         timeRow.addView(changeTimeBtn)
 
-        val statusHeader = TextView(this).apply {
-            text = "SMS status"
-            textSize = 16f
-            setPadding(0, 20, 0, 4)
+        togglesCard.addView(togglesHeader)
+        togglesCard.addView(newAppCb)
+        togglesCard.addView(AeroGlassUi.createDivider(this, verticalMarginDp = 3f))
+        togglesCard.addView(tamperCb)
+        togglesCard.addView(AeroGlassUi.createDivider(this, verticalMarginDp = 3f))
+        togglesCard.addView(dayUnlockCb)
+        togglesCard.addView(AeroGlassUi.createDivider(this, verticalMarginDp = 3f))
+        togglesCard.addView(dailyStatusCb)
+        togglesCard.addView(timeRow)
+
+        // Card 3: SMS Status
+        val statusCard = AeroGlassUi.createGlassCard(this, cornerDp = 22f).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            )
         }
+
+        val statusHeader = AeroGlassUi.createSectionTitle(this, "SMS status")
 
         statusView = TextView(this).apply {
             textSize = 14f
-            setPadding(0, 0, 0, 16)
+            typeface = AeroGlassUi.minimalistFont(light = false)
+            setLineSpacing(AeroGlassUi.dpF(this@SmsAlertsActivity, 2.5f), 1f)
+            setTextColor(AeroGlassUi.TEXT_SECONDARY)
         }
+
+        statusCard.addView(statusHeader)
+        statusCard.addView(statusView)
 
         column.addView(menuBackButton())
         column.addView(title)
         column.addView(intro)
-        column.addView(phoneLabel)
-        column.addView(phoneInput)
-        column.addView(saveNumberBtn)
-        column.addView(permBtn)
-        column.addView(restrictedBtn)
-        column.addView(testBtn)
-        column.addView(togglesHeader)
-        column.addView(newAppCb)
-        column.addView(tamperCb)
-        column.addView(dayUnlockCb)
-        column.addView(dailyStatusCb)
-        column.addView(timeRow)
-        column.addView(statusHeader)
-        column.addView(statusView)
+        column.addView(phoneCard)
+        column.addView(togglesCard)
+        column.addView(statusCard)
 
-        val scroll = ScrollView(this).apply {
-            isFillViewport = true
-            addView(column)
-        }
-        setContentView(scroll)
+        setContentView(AeroGlassUi.wrapScrollableScreen(this, column))
 
         refreshDailyTimeUi()
         refreshStatus()
@@ -225,7 +257,7 @@ class SmsAlertsActivity : PinLockedActivity() {
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
-        grantResults: IntArray
+        grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode != SMS_REQUEST) return
@@ -277,7 +309,7 @@ class SmsAlertsActivity : PinLockedActivity() {
         val error = SmsAlerts.enqueue(
             this,
             "Take a Break test message: SMS alerts are working.",
-            bypassDedupe = true
+            bypassDedupe = true,
         )
         if (error == null) {
             toast(
@@ -285,7 +317,7 @@ class SmsAlertsActivity : PinLockedActivity() {
                     "Airplane mode is on; test SMS queued for retry"
                 } else {
                     "Test SMS queued to $number"
-                }
+                },
             )
         } else {
             toast("Could not send: $error")
@@ -298,18 +330,18 @@ class SmsAlertsActivity : PinLockedActivity() {
         val minute = Prefs.getDailyStatusMinute(this)
         val is24Hour = DateFormat.is24HourFormat(this)
         showManagedDialog(
-            TimePickerDialog(
-                this,
-                { _, selectedHour, selectedMinute ->
-                    Prefs.setDailyStatusTime(this, selectedHour, selectedMinute)
-                    DailyStatusWorker.syncSchedule(this)
-                    refreshDailyTimeUi()
-                    toast("Daily status time set to ${formatTime(selectedHour, selectedMinute)}")
-                },
-                hour,
-                minute,
-                is24Hour,
-            ),
+            AeroGlassUi.createGlassTimePickerDialog(
+                context = this,
+                title = "Daily Status Time",
+                initialHour = hour,
+                initialMinute = minute,
+                is24Hour = is24Hour,
+            ) { selectedHour, selectedMinute ->
+                Prefs.setDailyStatusTime(this, selectedHour, selectedMinute)
+                DailyStatusWorker.syncSchedule(this)
+                refreshDailyTimeUi()
+                toast("Daily status time set to ${formatTime(selectedHour, selectedMinute)}")
+            },
         )
     }
 
@@ -360,17 +392,21 @@ class SmsAlertsActivity : PinLockedActivity() {
 
     private fun showSmsRestrictedHelp() {
         showManagedDialog(
-            AlertDialog.Builder(this)
-                .setTitle("SMS Permission Blocked?")
-                .setMessage(
-                    "On Android 13+ and GrapheneOS, Android hides \"Allow restricted settings\" if App Info is opened directly. You must open it from Settings → Apps → All apps:\n\n" +
-                        "1. Tap Open Apps Settings below (or go to Settings → Apps → See all apps) and select Take a Break.\n" +
-                        "2. Tap the ⋮ menu in the top-right corner (or scroll down) and enable Allow restricted settings.\n" +
-                        "3. Return here and tap Grant SMS Permission (or enable SMS under Permissions → SMS)."
-                )
-                .setPositiveButton("Open Apps Settings") { _, _ -> openAppsSettings() }
-                .setNegativeButton("Close", null)
-                .create(),
+            AeroGlassUi.createGlassDialog(
+                context = this,
+                title = "SMS Permission Blocked?",
+                message = "On Android 13+ and GrapheneOS, Android hides \"Allow restricted settings\" if App Info is opened directly. You must open it from Settings → Apps → All apps:\n\n" +
+                    "1. Tap Open Apps Settings below (or go to Settings → Apps → See all apps) and select Take a Break.\n\n" +
+                    "2. Tap the ⋮ menu in the top-right corner (or scroll down) and enable Allow restricted settings.\n\n" +
+                    "3. Return here and tap Grant SMS Permission (or enable SMS under Permissions → SMS).",
+                positiveText = "Open Apps Settings",
+                onPositive = { dlg ->
+                    dlg.dismiss()
+                    openAppsSettings()
+                },
+                negativeText = "Close",
+                onNegative = { it.dismiss() },
+            ),
         )
     }
 

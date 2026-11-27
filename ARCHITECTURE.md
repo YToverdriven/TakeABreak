@@ -1,6 +1,6 @@
 # Take a Break — Technical Architecture
 
-**Version 0.12.2**
+**Version 1.0**
 
 This document explains how **Take a Break** and **Take a Break Watcher** work internally, including blocking mechanics, cross-app security, tamper detection, SMS delivery guarantees, setup state machines, and build/signing structure.
 

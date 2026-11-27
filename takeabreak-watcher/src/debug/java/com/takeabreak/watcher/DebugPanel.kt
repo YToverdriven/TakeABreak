@@ -10,8 +10,8 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.provider.Settings
 import android.text.InputType
+import android.view.Gravity
 import android.view.inputmethod.EditorInfo
-import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -40,39 +40,63 @@ class DebugPanel(
     }
 
     fun attach(root: LinearLayout) {
-        val label = TextView(activity).apply {
-            text = "Messages from Take a Break"
-            textSize = 16f
-            setPadding(0, 20, 0, 8)
+        val dp = { value: Float -> AeroGlassUi.dp(activity, value) }
+
+        val messagesCard = AeroGlassUi.createGlassCard(activity, cornerDp = 22f).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(12f)
+                bottomMargin = dp(10f)
+            }
         }
+        messagesCard.addView(AeroGlassUi.createSectionTitle(activity, "Messages from Take a Break"))
         messageBox = TextView(activity).apply {
-            textSize = 15f
-            setPadding(24, 24, 24, 24)
-            setBackgroundColor(0xFFF0F0F0.toInt())
-            minLines = 6
+            textSize = 14f
+            typeface = AeroGlassUi.minimalistFont(light = false)
+            setLineSpacing(AeroGlassUi.dpF(activity, 2f), 1f)
+            setTextColor(AeroGlassUi.TEXT_BLACK)
+            gravity = Gravity.START
+            minLines = 4
         }
-        val logLabel = TextView(activity).apply {
-            text = "Link log"
-            textSize = 16f
-            setPadding(0, 16, 0, 8)
+        messagesCard.addView(messageBox)
+
+        val logCard = AeroGlassUi.createGlassCard(activity, cornerDp = 22f).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                bottomMargin = dp(10f)
+            }
         }
+        logCard.addView(AeroGlassUi.createSectionTitle(activity, "Link log"))
         linkLog = TextView(activity).apply {
             textSize = 13f
-            setPadding(16, 16, 16, 16)
-            setBackgroundColor(0xFFF7F7F7.toInt())
+            typeface = AeroGlassUi.minimalistFont(light = false)
+            setLineSpacing(AeroGlassUi.dpF(activity, 2f), 1f)
+            setTextColor(AeroGlassUi.TEXT_SECONDARY)
+            gravity = Gravity.START
         }
-        val smsLabel = TextView(activity).apply {
-            text = "Test SMS"
-            textSize = 16f
-            setPadding(0, 16, 0, 4)
+        logCard.addView(linkLog)
+
+        val smsCard = AeroGlassUi.createGlassCard(activity, cornerDp = 22f).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                bottomMargin = dp(6f)
+            }
         }
-        smsHint = TextView(activity).apply {
-            textSize = 13f
-            setPadding(0, 0, 0, 8)
+        smsCard.addView(AeroGlassUi.createSectionTitle(activity, "Test SMS"))
+        smsHint = AeroGlassUi.createCaptionText(activity, "").apply {
+            setPadding(0, 0, 0, dp(8f))
         }
-        smsInput = EditText(activity).apply {
-            hint = "Message"
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+        smsInput = AeroGlassUi.createGlassInput(
+            activity,
+            "Message",
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES,
+        ).apply {
             imeOptions = EditorInfo.IME_ACTION_SEND
             minLines = 2
             setOnEditorActionListener { _, actionId, _ ->
@@ -83,24 +107,21 @@ class DebugPanel(
                     false
                 }
             }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            )
         }
-        val send = Button(activity).apply {
-            text = "Send SMS"
-            setOnClickListener { sendTestSms() }
+        val send = AeroGlassUi.createGlassButton(
+            activity,
+            "Send SMS",
+            AeroGlassUi.GlassTone.LIQUID_SKY,
+        ) {
+            sendTestSms()
         }
+        smsCard.addView(smsHint)
+        smsCard.addView(smsInput)
+        smsCard.addView(send)
 
-        root.addView(label)
-        root.addView(messageBox)
-        root.addView(logLabel)
-        root.addView(linkLog)
-        root.addView(smsLabel)
-        root.addView(smsHint)
-        root.addView(smsInput)
-        root.addView(send)
+        root.addView(messagesCard)
+        root.addView(logCard)
+        root.addView(smsCard)
     }
 
     fun onStart() {
@@ -166,17 +187,21 @@ class DebugPanel(
 
     private fun showSmsRestrictedDialog() {
         dismissDialog()
-        val dialog = AlertDialog.Builder(activity)
-            .setTitle("SMS Permission Blocked?")
-            .setMessage(
-                "On Android 13+ and GrapheneOS, Android hides \"Allow restricted settings\" if App Info is opened directly. Open it from Settings → Apps → All apps:\n\n" +
-                    "1. Tap Open Apps Settings below (or go to Settings → Apps → See all apps) and select Take a Break Watcher.\n" +
-                    "2. Tap the ⋮ menu in the top-right corner (or scroll down) and enable Allow restricted settings.\n" +
-                    "3. Return here and grant SMS permission (or enable SMS under Permissions → SMS).",
-            )
-            .setPositiveButton("Open Apps Settings") { _, _ -> openAppsSettings() }
-            .setNegativeButton("Close", null)
-            .create()
+        val dialog = AeroGlassUi.createGlassDialog(
+            context = activity,
+            title = "SMS Permission Blocked?",
+            message = "On Android 13+ and GrapheneOS, Android hides \"Allow restricted settings\" if App Info is opened directly. Open it from Settings → Apps → All apps:\n\n" +
+                "1. Tap Open Apps Settings below (or go to Settings → Apps → See all apps) and select Take a Break Watcher.\n\n" +
+                "2. Tap the ⋮ menu in the top-right corner (or scroll down) and enable Allow restricted settings.\n\n" +
+                "3. Return here and grant SMS permission (or enable SMS under Permissions → SMS).",
+            positiveText = "Open Apps Settings",
+            onPositive = { dlg ->
+                dlg.dismiss()
+                openAppsSettings()
+            },
+            negativeText = "Close",
+            onNegative = { it.dismiss() },
+        )
         activeDialog = dialog
         dialog.setOnDismissListener {
             if (activeDialog === dialog) activeDialog = null
